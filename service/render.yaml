@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: agent-service
+    env: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    autoDeploy: true
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: AGENT_SERVICE_TOKEN
+        generateValue: true
+      - key: WEBHOOK_SECRET
+        generateValue: true
+      - key: GH_PAT
+        sync: false
+      - key: GH_OWNER
+        sync: false
+      - key: GH_REPO
+        sync: false
+      - key: OPENAI_MODEL_MANAGER
+        value: gpt-4o
+      - key: OPENAI_MODEL_WORKER
+        value: gpt-4o-mini

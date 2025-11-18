@@ -1,0 +1,33 @@
+name: Mobile Commands → Agent Service
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  route_command:
+    if: startsWith(github.event.comment.body, '/plan') || startsWith(github.event.comment.body, '/fix') || startsWith(github.event.comment.body, '/deploy')
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST /tasks to Agent Service
+        env:
+          URL: ${{ secrets.AGENT_SERVICE_URL }}
+          TOKEN: ${{ secrets.AGENT_SERVICE_TOKEN }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$TOKEN" ]; then
+            echo "Agent Service not configured; skipping."
+            exit 0
+          fi
+          cat > payload.json <<EOF
+          {
+            "type": "comment",
+            "repo": "${{ github.repository }}",
+            "payload": ${JSON.stringify(github.event || {})}
+          }
+          EOF
+          curl -sS -X POST "$URL/tasks"             -H "Content-Type: application/json"             -H "x-agent-token: $TOKEN"             --data @payload.json

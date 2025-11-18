@@ -1,0 +1,35 @@
+name: Intake → Agent Service
+
+on:
+  issues:
+    types: [opened, labeled, edited]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  notify_service:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.issue.labels.*.name, 'intake') || contains(github.event.issue.labels.*.name, 'ci-failure')
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST /tasks to Agent Service
+        env:
+          URL: ${{ secrets.AGENT_SERVICE_URL }}
+          TOKEN: ${{ secrets.AGENT_SERVICE_TOKEN }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$TOKEN" ]; then
+            echo "Agent Service not configured; skipping."
+            exit 0
+          fi
+          cat > payload.json <<EOF
+          {
+            "type": "intake",
+            "repo": "${{ github.repository }}",
+            "issueNumber": ${{ github.event.issue.number || 0 }},
+            "payload": ${JSON.stringify(github.event || {})}
+          }
+          EOF
+          curl -sS -X POST "$URL/tasks"             -H "Content-Type: application/json"             -H "x-agent-token: $TOKEN"             --data @payload.json
