@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Run {
+  id            String   @id @default(uuid())
+  repo          String
+  title         String?
+  description   String?
+  state         RunState @default(queued)
+  priority      Int      @default(0)
+  budgetUsd     Float    @default(5)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  blockedReason String?
+  labels        String[] @default([])
+  events        Event[]
+}
+
+model Event {
+  id        String   @id @default(uuid())
+  runId     String
+  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+}
+
+enum RunState {
+  queued
+  running
+  blocked
+  awaiting_unblock
+  done
+  failed
+}
+
