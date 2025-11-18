@@ -20,8 +20,8 @@ export async function handleTask(input: { type: string; repo?: string; issueNumb
 
   // Update public context snapshot (best-effort)
   try {
-    const repo = input.repo || process.env.DEFAULT_REPO || "";
-    if (repo.includes("/")) {
+    const repo = (input.repo && input.repo.trim()) || cfg.defaultRepo;
+    if (repo && repo.includes("/")) {
       const current = await safeGetState(repo);
       const updated = appendRunToState(current, {
         taskType: input.type,

@@ -3,6 +3,8 @@ export const cfg = {
   openaiKey: process.env.OPENAI_API_KEY || "",
   modelManager: process.env.OPENAI_MODEL_MANAGER || "gpt-4o",
   modelWorker: process.env.OPENAI_MODEL_WORKER || "gpt-4o-mini",
+  // Default owner/repo used when a repo is not explicitly provided
+  defaultRepo: process.env.DEFAULT_REPO || "DevinBristol/DevinSwarm",
   agentToken: process.env.AGENT_SERVICE_TOKEN || "",
   webhookSecret: process.env.WEBHOOK_SECRET || "",
   gh: {

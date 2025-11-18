@@ -1,0 +1,218 @@
+DEVINSWARM – CONTEXT BUGFIX & PERFORMANCE SCRIPT FOR CODEX
+==========================================================
+
+ROLE
+----
+You are Codex acting as a senior engineer on the DevinSwarm repo (OWNER/REPO: DevinBristol/DevinSwarm).
+
+The agent service is already running cleanly locally via:
+  cd service
+  npm run build
+  npm run start
+  # -> Agent Service listening on :8787
+
+HEALTH CHECK:
+  curl http://localhost:8787/healthz  ==> {"ok":true}
+
+Do NOT try to manage the server lifecycle yourself. Assume the server is running at http://localhost:8787.
+Your job is to:
+  1) Fix the empty-repo / GitHub 404 bug (`GET /repos///contents/.swarm%2Fstate.json - 404`).
+  2) Make the public /context endpoint reliable and fast.
+  3) Avoid unnecessary work that makes your own runs unbearably slow.
+  4) Adapt these instructions to the CURRENT live state of the repo (add ADJUSTMENT: notes where it differs).
+
+
+0) READ EXISTING DIRECTIONS (NO CHANGES YET)
+-------------------------------------------
+0.1 Locate and READ (no edits yet):
+    - DevinSwarm_Codex_Directions.txt       (if present)
+    - service/src/index.ts
+    - service/src/webhooks.ts               (or equivalent)
+    - service/src/workerEntrypoint.ts
+    - service/src/support/contextSnapshot.ts (if present)
+    - service/src/routes/context.ts          (if present)
+    - .swarm/state.json                      (if present)
+
+0.2 If any of these files do NOT exist, note that inline in THIS file using:
+    ADJUSTMENT: file X does not exist; I will create it following the intent.
+
+
+1) FIX EMPTY-REPO BUG IN CONTEXT SNAPSHOT
+-----------------------------------------
+Problem seen in logs:
+  GET /repos///contents/.swarm%2Fstate.json - 404 ...
+
+This means GitHub API is being called with empty owner/repo because the service resolved a blank repo string ("").
+
+1.0 Determine how the repo is resolved today
+    - Find ALL calls to getContextSnapshot(...) and writeContextSnapshot(...).
+    - For each call, note what argument is being passed:
+        - input.repo
+        - process.env.DEFAULT_REPO
+        - anything else
+
+1.1 Ensure DEFAULT_REPO is defined in the service environment
+    - In service/.env.example:
+        Add or confirm:
+          DEFAULT_REPO=DevinBristol/DevinSwarm
+      ADJUSTMENT: DEFAULT_REPO was already present in service/.env.example; no change required.
+    - In service/.env (do not commit secrets, but assume the user has it locally):
+        Ensure DEFAULT_REPO=DevinBristol/DevinSwarm is set.
+    - In service/src/config.ts (or equivalent config module):
+        Add a field to the exported config, for example:
+          defaultRepo: process.env.DEFAULT_REPO || "DevinBristol/DevinSwarm"
+        ADJUST names to match the actual config structure.
+
+1.2 Fix contextSnapshot helper so repo is never blank
+    In service/src/support/contextSnapshot.ts (adjust name/path as needed):
+
+    - Ensure the helper functions behave like this logic:
+
+      - Resolve repo using, in order of precedence:
+          1) explicit param passed to the function
+          2) cfg.defaultRepo or process.env.DEFAULT_REPO
+      - If after that repo does NOT contain "/", throw a clear error instead of calling GitHub with /repos///.
+
+    PSEUDO-CODE (ADAPT TO EXISTING CODE):
+
+      import { cfg } from "../config.js"; // or correct path
+
+      function resolveRepo(inputRepo?: string): { owner: string; name: string } {
+        const repo = (inputRepo && inputRepo.trim()) || cfg.defaultRepo;
+        if (!repo || !repo.includes("/")) {
+          throw new Error(`Invalid repo: "${repo}". Expected <owner>/<repo>.`);
+        }
+        const [owner, name] = repo.split("/");
+        return { owner, name };
+      }
+
+      export async function getContextSnapshot(repo?: string) {
+        const { owner, name } = resolveRepo(repo);
+        const path = ".swarm/state.json";
+        const { data } = await gh.repos.getContent({ owner, repo: name, path });
+        ...
+      }
+
+      export async function writeContextSnapshot(repo: string | undefined, json: any, branch = "main") {
+        const { owner, name } = resolveRepo(repo);
+        const path = ".swarm/state.json";
+        ...
+      }
+
+    - Adapt to the actual names/types you find.
+    - After the change, it must be impossible for GitHub to be called with owner=="" or repo=="".
+
+1.3 Ensure callers pass a repo or rely on DEFAULT_REPO
+    - In /context route and in any place where writeContextSnapshot/getContextSnapshot is called:
+      - If there’s no repo on the input, pass undefined and let resolveRepo fall back to cfg.defaultRepo.
+      - Alternatively, explicitly pass cfg.defaultRepo.
+
+    Example for /context route (ADAPT to existing file):
+
+      const repoParam = String(req.query.repo || "").trim();
+      const repo = repoParam || cfg.defaultRepo;
+      if (!repo.includes("/")) {
+        return res.status(400).json({ error: "repo must be <owner>/<repo>" });
+      }
+      const snap = await getContextSnapshot(repo);
+
+    - Add ADJUSTMENT: comments if your routing structure is different.
+
+
+2) MAKE /context STABLE AND FAST
+--------------------------------
+Goal: GET /context (or /context?repo=DevinBristol/DevinSwarm) must be:
+    - Fast
+    - Not crash on missing .swarm/state.json
+    - Not leak secrets
+
+2.1 Handle missing .swarm/state.json gracefully
+    - In getContextSnapshot:
+      - If GitHub returns 404 for .swarm/state.json, DO NOT throw a noisy error.
+      - Instead, return a sane default object, such as:
+
+        {
+          mission: "Host multiple agents under a Manager; parallel; escalate when stuck; budget soft cap $1,500/mo.",
+          budget: { softMonthlyUsd: 1500 },
+          repos: { default: "DevinBristol/DevinSwarm", allowList: ["DevinBristol/DevinSwarm"] },
+          workers: ["dev","test","research","ops","doc"],
+          goals: [],
+          lastRuns: []
+        }
+
+      - That default should be aligned with .swarm/state.json in the direction file, but minimal.
+
+2.2 Confirm that /context does NOT include secrets
+    - Before sending the JSON to the client, remove any fields that obviously look like secrets or internal tokens.
+    - If the snapshot includes a `secrets` or `tokens` field, drop it.
+    - This endpoint is intended to be public read-only context.
+
+2.3 GET /context verification
+    - With the service running, run:
+        curl "http://localhost:8787/context?repo=DevinBristol/DevinSwarm"
+      - It should return JSON quickly (sub-second).
+      - It should not show owner="", repo="".
+
+    - Add a short comment to this file:
+        ADJUSTMENT: /context verified locally; returned keys: [mission,budget,guardrails,repos,workers,goals,lastRuns].
+
+
+3) AVOID SLOW / UNNECESSARY WORK IN YOUR OWN RUNS
+-------------------------------------------------
+3.1 Do NOT run these commands inside your own tasks:
+    - npm run dev
+    - npm run start
+    - npm install or npm ci (unless absolutely necessary and after explicit instruction)
+
+    Assume the human user will:
+      - Start the agent with `npm run start`.
+      - Install dependencies when needed.
+
+3.2 When you need to test the service:
+    - Use the existing server at http://localhost:8787.
+    - Only hit:
+        - /healthz
+        - /context (with or without repo param)
+      unless specifically asked to exercise other endpoints.
+
+3.3 When analyzing the repo:
+    - Scope your analysis to only the files relevant to the current fix, e.g.:
+        - service/src/config.*
+        - service/src/support/contextSnapshot.*
+        - service/src/routes/context.*
+        - service/src/workerEntrypoint.*
+        - .swarm/state.json
+    - Avoid scanning the entire repo for this task.
+
+
+4) FINAL CHECKLIST & DELIVERABLES
+---------------------------------
+4.1 Code-level:
+    - No more GitHub calls that look like /repos///contents/...
+    - DEFAULT_REPO is set and used consistently.
+    - /context returns a stable JSON response even if .swarm/state.json is missing.
+    - /context never includes secrets or tokens.
+
+4.2 Logs:
+    - Restart the service:
+        cd service
+        npm run build
+        npm run start
+      Wait for:
+        Agent Service listening on :8787
+
+    - Hit /context:
+        curl "http://localhost:8787/context?repo=DevinBristol/DevinSwarm"
+      Confirm there is NO new `GET /repos///...` style log entry.
+
+4.3 Documentation:
+    - Add brief inline comments where you changed repo resolution, explaining:
+        - why DEFAULT_REPO exists
+        - how resolveRepo enforces owner/repo format
+
+4.4 Report back in a short markdown summary (to the user in the IDE):
+    - What changed (filenames + short explanation).
+    - How you verified it (commands run).
+    - Any remaining TODOs or edge cases noticed.
+
+END OF SCRIPT
