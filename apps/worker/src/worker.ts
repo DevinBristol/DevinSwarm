@@ -1,0 +1,119 @@
+import { makeWorker } from "../../../packages/shared/queue";
+import { PrismaClient } from "@prisma/client";
+import { ghInstallClient } from "../../../packages/shared/github";
+import { ALLOWED_REPOS, AUTO_MERGE_LOW_RISK } from "../../../packages/shared/policy";
+
+const prisma = new PrismaClient();
+const gh = ghInstallClient();
+
+// Dev worker v0: simple end-to-end PR to prove wiring.
+makeWorker(
+  "dev",
+  async (job: any) => {
+    const { runId } = job.data as { runId: string };
+    const run = await prisma.run.findUnique({ where: { id: runId } });
+    if (!run) return;
+
+    if (!ALLOWED_REPOS.has(run.repo)) {
+      await prisma.run.update({
+        where: { id: runId },
+        data: { state: "failed", blockedReason: "Repo not allowed" },
+      });
+      throw new Error(`Repo not allowed: ${run.repo}`);
+    }
+
+    await prisma.run.update({
+      where: { id: runId },
+      data: { state: "running" },
+    });
+
+    try {
+      const [owner, repo] = run.repo.split("/");
+      const repoInfo = await gh.request("GET /repos/{owner}/{repo}", { owner, repo });
+      const defaultBranch = (repoInfo.data as any).default_branch;
+
+      const baseRef = await gh.request("GET /repos/{owner}/{repo}/git/ref/{ref}", {
+        owner,
+        repo,
+        ref: `heads/${defaultBranch}`,
+      });
+      const baseSha = (baseRef.data as any).object.sha;
+
+      const branch = `swarm/run-${runId.slice(0, 8)}`;
+      await gh
+        .request("POST /repos/{owner}/{repo}/git/refs", {
+          owner,
+          repo,
+          ref: `refs/heads/${branch}`,
+          sha: baseSha,
+        })
+        .catch(() => {});
+
+      const tree = await gh.request("POST /repos/{owner}/{repo}/git/trees", {
+        owner,
+        repo,
+        base_tree: baseSha,
+        tree: [
+          {
+            path: "SWARM_PING.md",
+            mode: "100644",
+            type: "blob",
+            content: `Run ${runId}\n\n${run.description ?? ""}\n`,
+          },
+        ],
+      });
+
+      const commit = await gh.request("POST /repos/{owner}/{repo}/git/commits", {
+        owner,
+        repo,
+        message: `chore(swarm): scaffold for run ${runId}`,
+        tree: (tree.data as any).sha,
+        parents: [baseSha],
+      });
+
+      await gh.request("PATCH /repos/{owner}/{repo}/git/refs/{ref}", {
+        owner,
+        repo,
+        ref: `heads/${branch}`,
+        sha: (commit.data as any).sha,
+        force: true,
+      });
+
+      const pr = await gh.request("POST /repos/{owner}/{repo}/pulls", {
+        owner,
+        repo,
+        title: `Swarm: ${run.title ?? run.description ?? runId}`,
+        head: branch,
+        base: defaultBranch,
+        body: `Automated PR by DevinSwarm (run ${runId}).`,
+      });
+
+      if (AUTO_MERGE_LOW_RISK) {
+        try {
+          await gh.request("PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge", {
+            owner,
+            repo,
+            pull_number: (pr.data as any).number,
+            merge_method: "squash",
+          });
+        } catch {
+          // okay if branch protection blocks auto-merge
+        }
+      }
+
+      await prisma.run.update({
+        where: { id: runId },
+        data: { state: "done" },
+      });
+    } catch (err: any) {
+      await prisma.run.update({
+        where: { id: runId },
+        data: {
+          state: "awaiting_unblock",
+          blockedReason: String(err?.message ?? err),
+        },
+      });
+    }
+  },
+  2,
+);
