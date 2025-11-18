@@ -1,45 +1,23 @@
-DEVINSWARM – AGENT INSTRUCTIONS FOR CODEX
-=========================================
+# Repository Guidelines
 
-Purpose: When Codex is launched in this repo, always bootstrap yourself with the **live context** stored in GitHub, not just whatever happens to be on disk locally.
+## Project Structure & Module Organization
+DevinSwarm is a Node 20+ TypeScript repo built around the orchestrator-first design in `CODEx_RUNBOOK.md`. Keep graph/state/policy code in `/orchestrator`, HTTP adapters under `/service`, persistence queues inside `/runtime/{queue,store,events}`, and low-level integrations inside `/tools`. Workers (`dev`, `reviewer`, `research`, `ops`, `scout`) live under `/workers/*`, prompts under `/prompts`, and docs under `/docs`. Place UI assets such as `service/public/hitl.html` under `service/public/` and keep `*.spec.ts` files adjacent to their targets.
 
-Golden rule for this repo:
-- Treat `.swarm/state.json` on **GitHub** as the source of truth for mission/guardrails/goals/lastRuns.
-- Prefer the hosted Agent Service `/context` endpoint when it is available and healthy.
+## Build, Test, and Development Commands
+- `npm install` – sync dependencies for the orchestrator stack.
+- `npm run dev` – hot-reload `service/index.ts` through `nodemon`.
+- `npm run build` – compile TypeScript via `tsc -p tsconfig.json`.
+- `docker compose -f docker-compose.dev.yml up -d redis` – start the local Redis queue.
+- `npm run start:service` / `npm run start:dev-worker` – run the compiled HTTP service and dev worker to confirm `intake → plan → assign → report`.
 
-ON SESSION START (FIRST TURN ONLY)
-----------------------------------
-When you (the AI agent) start a new Codex session in this repo, do the following before making plans or edits:
+## Coding Style & Naming Conventions
+Follow `.editorconfig`: 2-space indent, LF, newline at EOF. Use strict TypeScript, ES modules, alphabetized imports, and `async` functions returning typed `Promise`s. Keep directories/file names `kebab-case`, exported types `PascalCase`, functions/vars `camelCase`, and env vars `SCREAMING_SNAKE_CASE`. Validate inputs with `zod` in `/orchestrator/state`, share constants through `/runtime/store`, and log via `winston`.
 
-1. Load local summary (fast, no network)
-   - Read `.swarm/summary.md` if it exists.
-   - Use it to very quickly understand mission, workers, guardrails, and recent runs.
+## Testing Guidelines
+Name tests after the node or worker under test (`manager.graph.spec.ts`, `queue.spec.ts`). Prefer colocated unit tests plus lightweight integration runs that exercise the complete flow by running `npm run build && npm run start:service` alongside `npm run start:dev-worker`, capturing logs that show a dummy task traversing all four states. Cover enqueue/reservation logic, HITL escalation triggers, and worker side effects; mock GitHub/filesystem calls but keep Redis/SQLite real for queue semantics.
 
-2. Fetch live context from GitHub (authoritative)
-   - If you have network access and a GitHub token available in the environment (for example `GITHUB_TOKEN` or `GH_PAT`), fetch **remote** `.swarm/state.json` for `DevinBristol/DevinSwarm`:
-     - Prefer the raw URL:
-       - `https://raw.githubusercontent.com/DevinBristol/DevinSwarm/main/.swarm/state.json`
-     - If raw access is not available, fall back to the GitHub REST API:
-       - `GET https://api.github.com/repos/DevinBristol/DevinSwarm/contents/.swarm/state.json`
-     - Parse the JSON and treat it as the canonical context snapshot.
-   - If network access is blocked or the fetch fails, fall back to the **local** `.swarm/state.json` in this checkout (if present).
+## Commit & Pull Request Guidelines
+Write imperative conventional commits such as `feat(orchestrator): stub assign node`. Every PR must include the runbook sections (**Goals**, **Plan**, **Artifacts**, **How to Unblock**) and note any required secrets or approvals via the escalation template before reallocating workers. Attach logs, screenshots, or traces that show new behavior, and block merging until `npm run build` (and future lint/tests) succeed.
 
-3. Optionally cross‑check with the hosted `/context` endpoint
-   - If you know the Agent Service base URL from env (for example `AGENT_SERVICE_URL`) and network access is allowed:
-     - Call `GET $AGENT_SERVICE_URL/context?repo=DevinBristol/DevinSwarm`.
-     - Prefer this response over raw `.swarm/state.json` if it succeeds, since the service may add additional derived fields.
-   - Do not fail the session if `/context` is unavailable; just log/mention the issue and fall back to the GitHub snapshot.
-
-HOW TO USE THE CONTEXT
-----------------------
-- Always keep the latest snapshot (from GitHub or `/context`) in mind when:
-  - Interpreting user requests.
-  - Proposing changes to workflows, the Agent Service, or the mission/goals.
-  - Deciding whether a change fits within guardrails/budget.
-- When drafting high‑level plans, refer to goals and guardrails from the snapshot instead of inventing new ones.
-
-SCOPE
------
-- These instructions apply to all work in this repository.
-- Do not modify this file unless the owner explicitly asks you to update the Codex bootstrap behavior.
-
+## Security & Configuration Tips
+Never commit `.env`; update `.env.example` whenever adding `OPENAI_API_KEY`, `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `REDIS_URL`, `SQLITE_URL`, later `POSTGRES_URL` or `CHATKIT_*`. Load variables through `dotenv` solely in entry points and pass them explicitly elsewhere. Document scopes when requesting GitHub or ChatKit secrets, store them in Actions → Secrets, and avoid logging secret material—emit token names or short hashes instead.

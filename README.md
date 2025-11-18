@@ -1,56 +1,107 @@
-# Manager–Worker **Swarm** Starter
+# DevinSwarm
 
-Day‑1 scaffolding for a hosted multi‑agent Manager/Workers framework that integrates with GitHub and Salesforce.
-This starter gives you:
+DevinSwarm is a Node 20+ TypeScript orchestrator built around LangGraph JS. It uses a Redis‑backed queue and dedicated workers to run 24/7 and handle multiple issues in parallel.
 
-- **Agent Service** (Node/TypeScript, Express) with a Manager that fans out to Workers (dev/test/research/ops/doc).
-- **GitHub Actions** for PR validation in Salesforce + CI‑failure auto‑issue + intake/command webhooks.
-- **Salesforce project** layout (`force-app/`) with a tiny Apex class & test so validation can run immediately.
-- **Docs**: Mission, Design, Ops Runbook.
-- **Render/Fly-ready** container (Dockerfile) for quick hosting.
-- **Mobile-friendly commands**: comment `/plan`, `/fix`, `/deploy` on Issues/PRs to trigger the service.
+This repo follows the `CODEx_RUNBOOK.md` plan, evolving toward:
 
-> Safe-by-default: service comments plans by default; auto‑PRs are gated behind an explicit toggle.
+- Manager / orchestrator (LangGraph JS) coordinating workers.
+- Workers (`dev`, `reviewer`, `research`, `ops`, `scout`) with full repo access.
+- Queue + store (`runtime/queue`, `runtime/store`) for durable, scalable runs.
+- Tools (`/tools`) for git, GitHub, CI, RAG, filesystem, etc.
+- HITL via ChatKit or GitHub comments.
 
----
+## Local Development
 
-## Quick Start (local smoke test)
+Prerequisites:
 
-1) **Prereqs** (Windows PowerShell):
-```powershell
-# optional helper to install common tools
-.\scripts\windows_bootstrap.ps1
+- Node.js >= 20
+- npm
+- Docker (for Redis in dev)
+
+Install dependencies:
+
+```bash
+npm install
 ```
 
-2) **Install & run the Agent Service locally**:
-```powershell
-cd service
-npm ci
-copy .env.example .env
-# set OPENAI_API_KEY and AGENT_SERVICE_TOKEN in .env
-npm run dev
-# server listens on http://localhost:8787
+Create an env file:
+
+```bash
+cp .env.example .env
 ```
 
-3) **GitHub repo**:
-```powershell
-git init
-git add -A
-git commit -m "feat: bootstrap swarm starter"
-git branch -M main
-git remote add origin https://github.com/DevinBristol/DevinSwarm.git
-git push -u origin main
+Fill in at least:
+
+- `OPENAI_API_KEY` – your OpenAI key (do not commit it).
+- `REDIS_URL=redis://localhost:6379`
+- `SQLITE_URL=devinswarm.db`
+
+Start Redis locally:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d redis
 ```
 
-4) **Repo settings (important)**:
-- Settings → Actions → General → **Workflow permissions** → **Read and write permissions**.
-- Add **Secrets and variables → Actions → New repository secret**:
-  - `SFDX_URL_VALIDATION` — auth URL for your Salesforce validation sandbox.
-  - (optional) `AGENT_SERVICE_URL` and `AGENT_SERVICE_TOKEN` — once you host the service.
+Build the project:
 
-5) **Try a PR**:
-- Open a PR that includes the preloaded `force-app` files.
-- The **PR Validate (Salesforce)** workflow runs and comments the status on the PR.
-- If it fails, a **CI failure** Issue is created automatically.
+```bash
+npm run build
+```
 
-See `docs/runbook.md` for full instructions.
+Run the HTTP service:
+
+```bash
+npm run start:service
+```
+
+Run the dev worker in another terminal:
+
+```bash
+npm run start:dev-worker
+```
+
+Trigger a dummy run:
+
+```bash
+curl -X POST http://localhost:3000/intake \
+  -H "Content-Type: application/json" \
+  -d "{\"description\":\"Test DevinSwarm run\"}"
+```
+
+You should receive a JSON response containing a `id` field. You can then query:
+
+```bash
+curl http://localhost:3000/runs/<id>
+```
+
+## Cloud Deployment (Render)
+
+This repo includes a `render.yaml` that defines:
+
+- A **web service** (`devinswarm-service`) running `npm run start:service`.
+- A **worker service** (`devinswarm-dev-worker`) running `npm run start:dev-worker`.
+
+High‑level steps:
+
+1. Push this repo to GitHub (e.g., `DevinBristol/DevinSwarm`).
+2. In Render, create a new Web Service from this repo:
+   - Use the config from `render.yaml`.
+3. In Render, create a Worker Service from the same repo:
+   - Use the `devinswarm-dev-worker` entry in `render.yaml`.
+4. Provide environment variables in Render for both services:
+   - `OPENAI_API_KEY`
+   - `REDIS_URL` (pointing at a Render Redis instance)
+   - `SQLITE_URL` or, later, `POSTGRES_URL` when we add Postgres.
+   - `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` once the GitHub App is set up.
+
+With those in place, the Render web + worker services give you a 24/7 cloud‑hosted DevinSwarm that can process jobs from the Redis queue.
+
+## CI
+
+The workflow at `.github/workflows/ci.yml`:
+
+- Runs on pushes and pull requests targeting `main`.
+- Installs dependencies and runs `npm run build`.
+
+Later steps in the runbook will extend this to run tests, linters, and security checks, and wire reviewer/ops workers and branch protections.
+

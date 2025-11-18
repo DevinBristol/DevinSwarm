@@ -1,6 +1,0 @@
-# local and tooling
-.sf/
-**/node_modules
-*.log
-*.tmp
-*.tsbuildinfo

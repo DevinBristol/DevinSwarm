@@ -1,0 +1,99 @@
+import {
+  Annotation,
+  END,
+  START,
+  StateGraph,
+} from "@langchain/langgraph";
+
+import type { RunInput } from "../state/runState.js";
+
+const OrchestratorState = Annotation.Root({
+  runId: Annotation<string>(),
+  description: Annotation<string>(),
+  plan: Annotation<string | null>(),
+  status: Annotation<string>(),
+  logs: Annotation<string[]>({
+    reducer: (left, right) => left.concat(right),
+    default: () => [],
+  }),
+});
+
+export type OrchestratorStateType = typeof OrchestratorState.State;
+
+const intakeNode = async (
+  state: OrchestratorStateType,
+): Promise<Partial<OrchestratorStateType>> => {
+  return {
+    status: "intake-complete",
+    logs: [`[intake] received run ${state.runId}`],
+  };
+};
+
+const planNode = async (
+  state: OrchestratorStateType,
+): Promise<Partial<OrchestratorStateType>> => {
+  const plan =
+    state.plan ?? `Draft plan for: ${state.description}`;
+
+  return {
+    status: "plan-complete",
+    plan,
+    logs: [`[plan] planned run ${state.runId}`],
+  };
+};
+
+const assignNode = async (
+  state: OrchestratorStateType,
+): Promise<Partial<OrchestratorStateType>> => {
+  return {
+    status: "assign-complete",
+    logs: [
+      `[assign] assigned dev worker for run ${state.runId}`,
+    ],
+  };
+};
+
+const reportNode = async (
+  state: OrchestratorStateType,
+): Promise<Partial<OrchestratorStateType>> => {
+  return {
+    status: "report-complete",
+    logs: [
+      `[report] completed run ${state.runId} with plan: ${
+        state.plan ?? "<none>"
+      }`,
+    ],
+  };
+};
+
+const graphBuilder = new StateGraph(OrchestratorState)
+  .addNode("intake", intakeNode)
+  .addNode("plan", planNode)
+  .addNode("assign", assignNode)
+  .addNode("report", reportNode)
+  .addEdge(START, "intake")
+  .addEdge("intake", "plan")
+  .addEdge("plan", "assign")
+  .addEdge("assign", "report")
+  .addEdge("report", END);
+
+export const orchestratorGraph = graphBuilder.compile({
+  name: "devinswarm-orchestrator",
+});
+
+export async function runDevWorkflow(
+  input: RunInput & { id: string },
+): Promise<OrchestratorStateType> {
+  const initialState: OrchestratorStateType = {
+    runId: input.id,
+    description: input.description,
+    plan: null,
+    status: "queued",
+    logs: [],
+  };
+
+  const result = await orchestratorGraph.invoke(initialState);
+
+  return result;
+}
+
