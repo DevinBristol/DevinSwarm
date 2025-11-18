@@ -38,7 +38,7 @@ git init
 git add -A
 git commit -m "feat: bootstrap swarm starter"
 git branch -M main
-git remote add origin <your-repo-url>
+git remote add origin https://github.com/DevinBristol/DevinSwarm.git
 git push -u origin main
 ```
 
