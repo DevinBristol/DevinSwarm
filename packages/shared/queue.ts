@@ -1,7 +1,9 @@
 import { Queue, Worker, JobsOptions, QueueEvents } from "bullmq";
 import IORedis from "ioredis";
 
-const connection = new IORedis(process.env.REDIS_URL!);
+const connection = new IORedis(process.env.REDIS_URL!, {
+  maxRetriesPerRequest: null,
+});
 
 export const devQueue = new Queue("dev", { connection });
 export const reviewQueue = new Queue("review", { connection });
@@ -20,4 +22,3 @@ export function makeWorker(name: string, processor: any, concurrency = 2): Worke
 export function events(name: string): QueueEvents {
   return new QueueEvents(name, { connection });
 }
-
