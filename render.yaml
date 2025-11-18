@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: devinswarm-service
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:service
+    plan: starter
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: REDIS_URL
+        sync: false
+      - key: SQLITE_URL
+        value: /data/devinswarm.db
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_INSTALLATION_ID
+        sync: false
+      - key: GITHUB_PRIVATE_KEY
+        sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
+
+  - type: worker
+    name: devinswarm-dev-worker
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:dev-worker
+    plan: starter
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: REDIS_URL
+        sync: false
+      - key: SQLITE_URL
+        value: /data/devinswarm.db
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_INSTALLATION_ID
+        sync: false
+      - key: GITHUB_PRIVATE_KEY
+        sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
+
