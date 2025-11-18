@@ -38,7 +38,7 @@ async function main(): Promise<void> {
     store.updateRun(job.data.id, {
       status: "completed",
       resultSummary:
-        result.plan ?? "Run completed successfully",
+        result.planSummary ?? "Run completed successfully",
       updatedAt: now,
     });
 
@@ -49,6 +49,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
+  console.error("Dev worker failed raw", error);
   logger.error("Dev worker failed", { error });
   process.exit(1);
 });

@@ -2,7 +2,9 @@ import { Queue, Worker } from "bullmq";
 import { Redis as RedisConstructor } from "ioredis";
 export const RUN_QUEUE_NAME = "devinswarm-runs";
 export function createRedisClient(redisUrl) {
-    return new RedisConstructor(redisUrl);
+    return new RedisConstructor(redisUrl, {
+        maxRetriesPerRequest: null,
+    });
 }
 export function createRunQueue(client) {
     return new Queue(RUN_QUEUE_NAME, {

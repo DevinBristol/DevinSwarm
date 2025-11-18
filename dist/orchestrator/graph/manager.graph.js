@@ -2,7 +2,7 @@ import { Annotation, END, START, StateGraph, } from "@langchain/langgraph";
 const OrchestratorState = Annotation.Root({
     runId: Annotation(),
     description: Annotation(),
-    plan: Annotation(),
+    planSummary: Annotation(),
     status: Annotation(),
     logs: Annotation({
         reducer: (left, right) => left.concat(right),
@@ -16,10 +16,11 @@ const intakeNode = async (state) => {
     };
 };
 const planNode = async (state) => {
-    const plan = state.plan ?? `Draft plan for: ${state.description}`;
+    const planSummary = state.planSummary ??
+        `Draft plan for: ${state.description}`;
     return {
         status: "plan-complete",
-        plan,
+        planSummary,
         logs: [`[plan] planned run ${state.runId}`],
     };
 };
@@ -35,7 +36,7 @@ const reportNode = async (state) => {
     return {
         status: "report-complete",
         logs: [
-            `[report] completed run ${state.runId} with plan: ${state.plan ?? "<none>"}`,
+            `[report] completed run ${state.runId} with plan: ${state.planSummary ?? "<none>"}`,
         ],
     };
 };
@@ -56,7 +57,7 @@ export async function runDevWorkflow(input) {
     const initialState = {
         runId: input.id,
         description: input.description,
-        plan: null,
+        planSummary: null,
         status: "queued",
         logs: [],
     };

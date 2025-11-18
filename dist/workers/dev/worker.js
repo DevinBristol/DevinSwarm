@@ -25,7 +25,7 @@ async function main() {
         const now = new Date().toISOString();
         store.updateRun(job.data.id, {
             status: "completed",
-            resultSummary: result.plan ?? "Run completed successfully",
+            resultSummary: result.planSummary ?? "Run completed successfully",
             updatedAt: now,
         });
         logger.info(`Completed run ${job.data.id}`);
@@ -33,6 +33,7 @@ async function main() {
     logger.info("Dev worker started");
 }
 main().catch((error) => {
+    console.error("Dev worker failed raw", error);
     logger.error("Dev worker failed", { error });
     process.exit(1);
 });

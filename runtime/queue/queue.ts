@@ -9,7 +9,9 @@ export type RunJobPayload = RunInput & { id: string };
 export const RUN_QUEUE_NAME = "devinswarm-runs";
 
 export function createRedisClient(redisUrl: string): RedisClient {
-  return new RedisConstructor(redisUrl);
+  return new RedisConstructor(redisUrl, {
+    maxRetriesPerRequest: null,
+  });
 }
 
 export function createRunQueue(

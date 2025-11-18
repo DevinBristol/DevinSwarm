@@ -10,7 +10,7 @@ import type { RunInput } from "../state/runState.js";
 const OrchestratorState = Annotation.Root({
   runId: Annotation<string>(),
   description: Annotation<string>(),
-  plan: Annotation<string | null>(),
+  planSummary: Annotation<string | null>(),
   status: Annotation<string>(),
   logs: Annotation<string[]>({
     reducer: (left, right) => left.concat(right),
@@ -32,12 +32,13 @@ const intakeNode = async (
 const planNode = async (
   state: OrchestratorStateType,
 ): Promise<Partial<OrchestratorStateType>> => {
-  const plan =
-    state.plan ?? `Draft plan for: ${state.description}`;
+  const planSummary =
+    state.planSummary ??
+    `Draft plan for: ${state.description}`;
 
   return {
     status: "plan-complete",
-    plan,
+    planSummary,
     logs: [`[plan] planned run ${state.runId}`],
   };
 };
@@ -59,9 +60,9 @@ const reportNode = async (
   return {
     status: "report-complete",
     logs: [
-      `[report] completed run ${state.runId} with plan: ${
-        state.plan ?? "<none>"
-      }`,
+      `[report] completed run ${
+        state.runId
+      } with plan: ${state.planSummary ?? "<none>"}`,
     ],
   };
 };
@@ -87,7 +88,7 @@ export async function runDevWorkflow(
   const initialState: OrchestratorStateType = {
     runId: input.id,
     description: input.description,
-    plan: null,
+    planSummary: null,
     status: "queued",
     logs: [],
   };
