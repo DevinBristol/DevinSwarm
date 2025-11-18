@@ -48,7 +48,7 @@ jobs:
             }
 
             const body = swarmComment.body;
-            const match = body.match(/<!-- SWARM_PATCH_START -->([\\s\\S]*?)<!-- SWARM_PATCH_END -->/);
+            const match = body.match(/<!-- SWARM_PATCH_START -->([\s\S]*?)<!-- SWARM_PATCH_END -->/);
             if (!match) {
               core.info('SWARM patch markers present but no extractable patch block.');
               core.setOutput('hasPatch', 'false');
