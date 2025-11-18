@@ -1,0 +1,13 @@
+# Node/build
+node_modules/
+dist/
+
+# Local env & DB
+.env
+*.db
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+

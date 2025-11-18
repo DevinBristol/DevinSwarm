@@ -1,18 +1,22 @@
 {
   "compilerOptions": {
-    "target": "ES2021",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
-    "esModuleInterop": true,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": [
+      "ES2023"
+    ],
     "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "rootDir": ".",
     "outDir": "dist",
-    "resolveJsonModule": true
+    "sourceMap": true,
+    "noEmitOnError": true
   },
   "include": [
-    "apps/**/*",
-    "packages/**/*",
-    "prisma/**/*",
     "service/**/*.ts",
     "orchestrator/**/*.ts",
     "runtime/**/*.ts",
@@ -26,3 +30,4 @@
     "dist"
   ]
 }
+

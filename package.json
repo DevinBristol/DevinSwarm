@@ -2,30 +2,47 @@
   "name": "devinswarm",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
+    "build": "tsc --noEmit",
+    "start:service": "tsx apps/service/src/server.ts",
+    "start:worker": "tsx apps/worker/src/worker.ts",
+    "start:scout": "tsx apps/scout/src/scout.ts",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "lint": "echo 'add eslint later'",
     "dev": "nodemon service/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start:service": "node dist/service/index.js",
-    "start:dev-worker": "node dist/workers/dev/worker.js",
-    "lint": "eslint ."
+    "start:dev-worker": "node dist/workers/dev/worker.js"
+  },
+  "engines": {
+    "node": ">=20 <21",
+    "npm": ">=10"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
+    "@types/node": "^22.9.0",
     "nodemon": "^3.1.11",
+    "prisma": "^5.21.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
   },
   "dependencies": {
     "@langchain/langgraph": "^1.0.2",
+    "@octokit/auth-app": "^7.0.0",
+    "@octokit/core": "^6.1.2",
     "@octokit/rest": "^21.0.0",
-    "bullmq": "^5.0.0",
+    "@prisma/client": "^5.21.1",
+    "better-sqlite3": "^11.7.0",
+    "bullmq": "^5.7.7",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
+    "fastify": "^4.28.1",
+    "fastify-healthcheck": "^4.4.0",
     "ioredis": "^5.4.1",
+    "openai": "^4.77.0",
+    "pino": "^9.5.0",
     "uuid": "^11.0.3",
     "winston": "^3.15.0",
-    "zod": "^3.24.1",
-    "better-sqlite3": "^11.7.0"
+    "zod": "^3.24.1"
   }
 }
