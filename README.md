@@ -105,3 +105,37 @@ The workflow at `.github/workflows/ci.yml`:
 
 Later steps in the runbook will extend this to run tests, linters, and security checks, and wire reviewer/ops workers and branch protections.
 
+## DevinSwarm Bootstrap
+
+This repo contains a multi-agent swarm with:
+
+- Web service: `/health`, `/intake`, `/runs`, `/ui`
+- Worker: BullMQ (Redis) with concurrency 2
+- Durable state: Postgres (Prisma)
+- GitHub App: direct repo read/write (branches, commits, PRs)
+- Policy: daily budget, optional low-risk auto-merge
+- Escalation: blocked runs marked `awaiting_unblock` and surfaced via UI or GitHub Issue conventions.
+
+### Local development
+
+```bash
+cp .env.example .env
+docker compose -f infra/docker-compose.dev.yml up -d
+npm ci
+npm run db:generate
+npm run db:push
+npm run start:service  # http://localhost:3000/ui
+npm run start:worker
+```
+
+### Render deployment
+
+Use `infra/render.yaml` as a Blueprint in Render. Set the following environment variables in the Render dashboard (do not commit secrets):
+
+- `OPENAI_API_KEY`
+- `GITHUB_APP_ID`
+- `GITHUB_INSTALLATION_ID`
+- `GITHUB_PRIVATE_KEY`
+- `GITHUB_WEBHOOK_SECRET`
+- `UI_TOKEN`
+
