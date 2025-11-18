@@ -1,8 +1,7 @@
 # DevinSwarm Summary
-- Mission: parallel Manager/Workers, escalate only when stuck, budget soft cap $1,500/mo.
+- Mission: Host multiple agents under a Manager; parallel work; escalate when blocked; maximize autonomy within budget.
 - Repo: DevinBristol/DevinSwarm
 - Workers: dev, test, research, ops, doc
-- Guardrails: maxToolCallsPerRun=20; escalate if blocked>10min or >=3 tool failures.
-- Current Goals: G-001 (context endpoint, intake + plan), G-002 (autobranch on /fix).
-- Last runs: (service writes recent runs here)
-
+- Guardrails: maxToolCallsPerRun=20; escalate=blocked>10min; >=3 tool failures; policy conflict
+- Current Goals: G-001 Hosted parallel Manager/Workers with /context, G-002 Autobranch & draft PR on /fix
+- Last runs: 0
