@@ -67,6 +67,29 @@ app.post("/runs/:id/unblock", async (req, rep) => {
   return { ok: true };
 });
 
+app.get("/debug/env", async (req, rep) => {
+  const token = (req.headers["x-ui-token"] ?? "") as string;
+  if (token !== process.env.UI_TOKEN) return rep.code(401).send({ error: "unauthorized" });
+
+  const envSnapshot = {
+    NODE_ENV: process.env.NODE_ENV ?? null,
+    PORT: process.env.PORT ?? null,
+    DATABASE_URL: Boolean(process.env.DATABASE_URL),
+    REDIS_URL: Boolean(process.env.REDIS_URL),
+    GITHUB_APP_ID: process.env.GITHUB_APP_ID ?? null,
+    GITHUB_INSTALLATION_ID: process.env.GITHUB_INSTALLATION_ID ?? null,
+    GITHUB_PRIVATE_KEY_PRESENT: Boolean(process.env.GITHUB_PRIVATE_KEY),
+    GITHUB_WEBHOOK_SECRET_PRESENT: Boolean(process.env.GITHUB_WEBHOOK_SECRET),
+    OPENAI_API_KEY_PRESENT: Boolean(process.env.OPENAI_API_KEY),
+    DAILY_BUDGET_USD: process.env.DAILY_BUDGET_USD ?? null,
+    AUTO_MERGE_LOW_RISK: process.env.AUTO_MERGE_LOW_RISK ?? null,
+    ALLOWED_REPOS: process.env.ALLOWED_REPOS ?? null,
+    UI_TOKEN_PRESENT: Boolean(process.env.UI_TOKEN),
+  };
+
+  return envSnapshot;
+});
+
 app.get("/ui", async (_req, rep) => {
   const runs = await prisma.run.findMany({
     orderBy: { createdAt: "desc" },

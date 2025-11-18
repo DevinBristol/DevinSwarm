@@ -6,6 +6,24 @@ import { ALLOWED_REPOS, AUTO_MERGE_LOW_RISK } from "../../../packages/shared/pol
 const prisma = new PrismaClient();
 const gh = ghInstallClient();
 
+// Log a safe snapshot of worker-relevant env (no secret content).
+// This is useful to compare local vs Render configuration via logs.
+// Values that could contain secrets are only reported as present/missing.
+// eslint-disable-next-line no-console
+console.log("Dev worker env snapshot", {
+  NODE_ENV: process.env.NODE_ENV ?? null,
+  DATABASE_URL_PRESENT: Boolean(process.env.DATABASE_URL),
+  REDIS_URL_PRESENT: Boolean(process.env.REDIS_URL),
+  GITHUB_APP_ID: process.env.GITHUB_APP_ID ?? null,
+  GITHUB_INSTALLATION_ID: process.env.GITHUB_INSTALLATION_ID ?? null,
+  GITHUB_PRIVATE_KEY_PRESENT: Boolean(process.env.GITHUB_PRIVATE_KEY),
+  GITHUB_WEBHOOK_SECRET_PRESENT: Boolean(process.env.GITHUB_WEBHOOK_SECRET),
+  OPENAI_API_KEY_PRESENT: Boolean(process.env.OPENAI_API_KEY),
+  DAILY_BUDGET_USD: process.env.DAILY_BUDGET_USD ?? null,
+  AUTO_MERGE_LOW_RISK: process.env.AUTO_MERGE_LOW_RISK ?? null,
+  ALLOWED_REPOS: process.env.ALLOWED_REPOS ?? null,
+});
+
 // Dev worker v0: simple end-to-end PR to prove wiring.
 makeWorker(
   "dev",

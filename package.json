@@ -12,7 +12,7 @@
     "db:push": "prisma db push",
     "lint": "echo 'add eslint later'",
     "dev": "nodemon service/index.ts",
-    "start:dev-worker": "node dist/workers/dev/worker.js"
+    "start:dev-worker": "tsx workers/dev/worker.ts"
   },
   "engines": {
     "node": ">=20 <21",
