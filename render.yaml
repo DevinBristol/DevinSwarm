@@ -1,22 +1,24 @@
 services:
   - type: web
     name: devinswarm-service
-    env: node
-    buildCommand: npm install && npm run build
-    startCommand: npm run start:service
+    runtime: node
     plan: starter
-    autoDeploy: true
+    buildCommand: "npm ci && npm run db:generate && npm run db:push && npm run build"
+    startCommand: "npm run start:service"
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: "10000"
-      - key: REDIS_URL
-        sync: false
-      - key: SQLITE_URL
-        value: /data/devinswarm.db
+      - key: NODE_VERSION
+        value: "20.19.0"
       - key: OPENAI_API_KEY
         sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: devinswarm-kv
+          property: connectionString
+      - key: DATABASE_URL
+        fromDatabase:
+          name: devinswarm-postgres
+          property: connectionString
       - key: GITHUB_APP_ID
         sync: false
       - key: GITHUB_INSTALLATION_ID
@@ -25,29 +27,55 @@ services:
         sync: false
       - key: GITHUB_WEBHOOK_SECRET
         sync: false
+      - key: DAILY_BUDGET_USD
+        value: "75"
+      - key: AUTO_MERGE_LOW_RISK
+        value: "true"
+      - key: ALLOWED_REPOS
+        value: "DevinBristol/DevinSwarm"
+      - key: UI_TOKEN
+        sync: false
+    healthCheckPath: "/health"
 
   - type: worker
-    name: devinswarm-dev-worker
-    env: node
-    buildCommand: npm install && npm run build
-    startCommand: npm run start:dev-worker
+    name: devinswarm-worker
+    runtime: node
     plan: starter
-    autoDeploy: true
+    buildCommand: "npm ci && npm run db:generate && npm run db:push && npm run build"
+    startCommand: "npm run start:worker"
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: REDIS_URL
-        sync: false
-      - key: SQLITE_URL
-        value: /data/devinswarm.db
+      - key: NODE_VERSION
+        value: "20.19.0"
       - key: OPENAI_API_KEY
         sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: devinswarm-kv
+          property: connectionString
+      - key: DATABASE_URL
+        fromDatabase:
+          name: devinswarm-postgres
+          property: connectionString
       - key: GITHUB_APP_ID
         sync: false
       - key: GITHUB_INSTALLATION_ID
         sync: false
       - key: GITHUB_PRIVATE_KEY
         sync: false
-      - key: GITHUB_WEBHOOK_SECRET
-        sync: false
+      - key: DAILY_BUDGET_USD
+        value: "75"
+      - key: AUTO_MERGE_LOW_RISK
+        value: "true"
+      - key: ALLOWED_REPOS
+        value: "DevinBristol/DevinSwarm"
+
+  - type: keyvalue
+    name: devinswarm-kv
+    plan: starter
+    ipAllowList: []
+
+databases:
+  - name: devinswarm-postgres
+    plan: starter
 
