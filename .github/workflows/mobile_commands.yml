@@ -23,11 +23,15 @@ jobs:
             echo "Agent Service not configured; skipping."
             exit 0
           fi
-          cat > payload.json <<EOF
-          {
-            "type": "comment",
-            "repo": "${{ github.repository }}",
-            "payload": ${JSON.stringify(github.event || {})}
-          }
+          node - <<'EOF'
+          const fs = require('fs');
+          const eventPath = process.env.GITHUB_EVENT_PATH;
+          const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+          const body = {
+            type: "comment",
+            repo: process.env.GITHUB_REPOSITORY,
+            payload
+          };
+          fs.writeFileSync('payload.json', JSON.stringify(body));
           EOF
           curl -sS -X POST "$URL/tasks"             -H "Content-Type: application/json"             -H "x-agent-token: $TOKEN"             --data @payload.json
