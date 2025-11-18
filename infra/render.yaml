@@ -77,5 +77,3 @@ services:
 
 databases:
   - name: devinswarm-postgres
-    plan: starter
-
