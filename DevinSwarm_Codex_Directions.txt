@@ -1,0 +1,325 @@
+DEVINSWARM – DIRECTION FILE FOR CODEX
+=====================================
+Purpose: Apply and verify the repo + hosting modifications so DevinSwarm runs a hosted, parallel Manager/Workers agent swarm with a **public /context endpoint**, durable repo-based context, and GitHub-driven workflow triggers.
+
+Golden Rule (must remain true after any change):
+  Host multiple agents **simultaneously** that report to a **Manager** in **parallel**, escalate only when stuck, and operate within a **$1,500/month soft budget**.
+
+YOU ARE: Codex acting as a senior engineer + release steward. Your job is to (1) adapt these steps to the **current live state** of the repo, (2) resolve conflicts, (3) produce minimal diffs, and (4) verify end-to-end.
+
+If the live repo differs, annotate this file inline with “ADJUSTMENT:” and apply the corrected steps. Do not remove the Golden Rule.
+
+
+0) PROJECT VARIABLES (EDIT HERE IF DIFFERENT)
+---------------------------------------------
+- OWNER/REPO: DevinBristol/DevinSwarm
+- DEFAULT_REPO (service env): DevinBristol/DevinSwarm
+- PUBLIC CONTEXT ENDPOINT: GET https://<AGENT_SERVICE_HOST>/context
+- MONTHLY_SOFT_BUDGET_USD: 1500
+- DAILY_CAP_USD (suggested): 75
+- VALIDATION ORG ALIAS: validation (maps to a Salesforce sandbox via SFDX_URL_VALIDATION secret)
+
+
+1) REPO SETTINGS (ONCE)
+-----------------------
+1.1 GitHub → Settings → Actions → General → Workflow permissions → set to **Read and write permissions**.
+1.2 GitHub → Settings → Secrets and variables → Actions → add (or confirm):
+    - SFDX_URL_VALIDATION : SFDX auth URL for validation sandbox
+    - AGENT_SERVICE_URL   : https://<your-host>/ (optional if using webhooks only)
+    - AGENT_SERVICE_TOKEN : random long string
+    - WEBHOOK_SECRET      : random long string (for GitHub → /webhooks/github HMAC)
+    - (optional) GH_PAT   : repo-scoped PAT if the service itself will open branches/PRs
+1.3 If repo is private and the service must read it, prefer a GitHub App; otherwise a PAT is acceptable for Day‑1.
+
+
+2) CONTEXT SPINE IN REPO (DURABLE MISSION & STATE)
+--------------------------------------------------
+Create/ensure the following files. If they exist, merge without losing fields.
+
+2.1 .swarm/state.json  (machine-readable current truth)
+-------------------------------------------------------
+ADJUSTMENT: Implemented and added on branch swarm-bootstrap as written below.
+{
+  "mission": "Host multiple agents under a Manager; parallel work; escalate when blocked; maximize autonomy within budget.",
+  "budget": { "softMonthlyUsd": 1500, "dailyCapUsd": 75 },
+  "guardrails": {
+    "maxToolCallsPerRun": 20,
+    "escalateIf": ["blocked>10min", ">=3 tool failures", "policy conflict"]
+  },
+  "repos": { "default": "DevinBristol/DevinSwarm", "allowList": ["DevinBristol/DevinSwarm"] },
+  "workers": ["dev","test","research","ops","doc"],
+  "goals": [
+    { "id":"G-001","title":"Hosted parallel Manager/Workers with /context","priority":1,"doneWhen":[
+      "GET /context returns mission/guardrails/goals/lastRuns",
+      "Issues with label 'intake' → plan within 5 min",
+      "PR comment '/plan' returns Manager + Workers output"
+    ]},
+    { "id":"G-002","title":"Autobranch & draft PR on /fix","priority":2,"doneWhen":[
+      "Branch per task",
+      "Draft PR + checklist"
+    ]}
+  ],
+  "lastRuns": []
+}
+
+2.2 .swarm/summary.md  (human + AI bootstrap digest)
+----------------------------------------------------
+ADJUSTMENT: Implemented and added on branch swarm-bootstrap as written below; context_snapshot workflow maintains it.
+# DevinSwarm Summary
+- Mission: parallel Manager/Workers, escalate only when stuck, budget soft cap $1,500/mo.
+- Repo: DevinBristol/DevinSwarm
+- Workers: dev, test, research, ops, doc
+- Guardrails: maxToolCallsPerRun=20; escalate if blocked>10min or ≥3 tool failures.
+- Current Goals: G-001 (context endpoint, intake → plan), G-002 (autobranch on /fix).
+- Last runs: (service writes recent runs here)
+
+2.3 docs/hosted_agents_mission.md (source-of-truth mission; keep succinct)
+--------------------------------------------------------------------------
+# Mission
+Operate multiple domain workers in **parallel** under a single **Manager**; act autonomously on new tasks; escalate only when blocked; respect budget caps.
+- Budget: soft cap **$1,500/month**.
+- Writes go through PRs + tests; no direct writes to protected branches.
+- Manager reads this file on **every** run.
+
+2.4 (optional) .swarm/charters/{manager,dev,test,research,ops,doc}.md
+---------------------------------------------------------------------
+Describe role boundaries and allowed file globs per worker (code, tests, docs).
+
+
+3) SERVICE: PUBLIC /context ENDPOINT + SNAPSHOT WRITES
+------------------------------------------------------
+Goal: after every Manager run, write `.swarm/state.json` (and keep it sane), and serve it publicly via GET /context.
+
+File paths assume the Node/TS service is under `service/` with `src/` entry. Adjust if different.
+
+3.1 Add file: service/src/routes/context.ts
+-------------------------------------------
+import type { Request, Response } from "express";
+import { getContextSnapshot } from "../support/contextSnapshot.js";
+
+export async function contextRoute(req: Request, res: Response) {
+  const repo = String(req.query.repo || process.env.DEFAULT_REPO || "");
+  if (!repo.includes("/")) return res.status(400).json({ error: "repo must be <owner>/<repo>" });
+  try {
+    const snap = await getContextSnapshot(repo);
+    const { secrets, ...safe } = snap || {};
+    res.json(safe);
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "failed to load context" });
+  }
+}
+
+3.2 Add file: service/src/support/contextSnapshot.ts
+----------------------------------------------------
+import { Octokit } from "@octokit/rest";
+import { Buffer } from "node:buffer";
+
+const gh = new Octokit({ auth: process.env.GH_PAT || process.env.GITHUB_TOKEN });
+export async function getContextSnapshot(repo: string) {
+  const [owner, name] = repo.split("/");
+  const path = ".swarm/state.json";
+  const { data } = await gh.repos.getContent({ owner, repo: name, path });
+  if (!("content" in data)) throw new Error("state.json is not a file");
+  const decoded = Buffer.from((data as any).content, "base64").toString("utf8");
+  return JSON.parse(decoded);
+}
+
+export async function writeContextSnapshot(repo: string, json: any, branch = "main") {
+  const [owner, name] = repo.split("/");
+  const path = ".swarm/state.json";
+  let sha: string | undefined;
+  try {
+    const existing = await gh.repos.getContent({ owner, repo: name, path, ref: branch });
+    if ("sha" in existing.data) sha = (existing.data as any).sha;
+  } catch { /* new file */ }
+  await gh.repos.createOrUpdateFileContents({
+    owner, repo: name, path, branch,
+    message: "chore(swarm): update context snapshot",
+    content: Buffer.from(JSON.stringify(json, null, 2)).toString("base64"),
+    sha
+  });
+}
+
+3.3 Wire the route in service/src/index.ts
+------------------------------------------
++ import { contextRoute } from "./routes/context.js";
+  ...
+  app.get("/context", contextRoute);
+
+3.4 Update service/src/workerEntrypoint.ts (write snapshot after each run)
+--------------------------------------------------------------------------
++ import { writeContextSnapshot } from "./support/contextSnapshot.js";
+  ...
+  export async function handleTask(input: { type: string; repo?: string; issueNumber?: number; payload: any; }) {
+    const context = JSON.stringify(input.payload, null, 2);
+    const { plan, results } = await runManager(context);
+    const md = renderReport(plan, results);
+
+    // (existing) comment back to GitHub ...
+
++   // Update public context snapshot (best-effort)
++   try {
++     const repo = input.repo || process.env.DEFAULT_REPO || "";
++     if (repo.includes("/")) {
++       await writeContextSnapshot(repo, {
++         ...requireSafeStateDefaults(),  // if you have a helper, else inline
++         updatedAt: new Date().toISOString(),
++         mission: "Host multiple agents under a Manager; parallel; escalate when stuck; budget soft cap $1,500/mo.",
++         goals: mergeLatestGoals(plan),
++         lastRuns: appendRun(results)
++       });
++     }
++   } catch (e) { console.error("snapshot update failed", e); }
+
+    return { plan, results };
+  }
+
+// If requireSafeStateDefaults/mergeLatestGoals/appendRun don't exist, inline minimal logic:
+// - Read current .swarm/state.json via getContextSnapshot(repo) and update fields; avoid losing keys.
+
+3.5 service/.env.example (ensure these keys exist)
+--------------------------------------------------
+# Existing keys remain ...
+DEFAULT_REPO=DevinBristol/DevinSwarm
+BUDGET_USD_DAILY=75
+
+# (keep AGENT_SERVICE_TOKEN/WEBHOOK_SECRET/OPENAI_* as-is)
+
+3.6 package.json (deps already include @octokit/rest; if not, add it)
+---------------------------------------------------------------------
+npm i @octokit/rest
+
+3.7 Build & run checks (local or Render)
+----------------------------------------
+npm ci && npm run build
+# locally:
+npm run start
+# Verify:
+curl -s http://localhost:8787/healthz
+curl -s "http://localhost:8787/context?repo=DevinBristol/DevinSwarm"
+
+
+4) GITHUB WORKFLOWS (VERIFY/ADD)
+--------------------------------
+All files go under .github/workflows/. Use minimal diffs; keep job names stable.
+
+4.1 PR Validate (Salesforce) – validate.yml
+-------------------------------------------
+- Must include:
+  permissions:
+    contents: read
+    pull-requests: write
+    issues: write
+- Use:
+  sf project deploy validate --target-org validation --source-dir force-app --test-level RunLocalTests
+
+4.2 CI failure → Issue – ci_failure_issue.yml
+---------------------------------------------
+- Triggers on workflow_run of PR Validate.
+- Opens or updates an Issue with labels: ci-failure, needs-attention.
+
+4.3 Intake → Agent Service – issue_intake.yml
+---------------------------------------------
+- Triggers when an Issue has label intake OR ci-failure.
+- POSTs to ${{ secrets.AGENT_SERVICE_URL }}/tasks with x-agent-token.
+
+4.4 Mobile commands – mobile_commands.yml
+-----------------------------------------
+- Triggers on /plan | /fix | /deploy comments.
+- POSTs to Agent Service (same as intake).
+
+4.5 (New) Context snapshot refresher – context_snapshot.yml
+-----------------------------------------------------------
+name: Context Snapshot
+on:
+  schedule: [{ cron: "*/30 * * * *" }]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build summary from state
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '.swarm/state.json';
+            const raw = fs.readFileSync(path, 'utf8');
+            const state = JSON.parse(raw);
+            const lines = [];
+            lines.push('# DevinSwarm Summary');
+            lines.push(`- Mission: ${state.mission}`);
+            lines.push(`- Repo: ${state.repos?.default || 'N/A'}`);
+            lines.push(`- Workers: ${(state.workers||[]).join(', ')}`);
+            lines.push(`- Guardrails: maxToolCallsPerRun=${state.guardrails?.maxToolCallsPerRun}; escalate=${(state.guardrails?.escalateIf||[]).join('; ')}`);
+            const goals = (state.goals||[]).map(g=>g.id + ' ' + g.title).join(', ');
+            lines.push(`- Current Goals: ${goals}`);
+            const last = (state.lastRuns||[]).slice(-5);
+            lines.push(`- Last runs: ${last.length}`);
+            fs.writeFileSync('.swarm/summary.md', lines.join('\n') + '\n');
+      - name: Commit summary
+        run: |
+          git config user.name "swarm-bot"
+          git config user.email "swarm-bot@users.noreply.github.com"
+          git add .swarm/summary.md
+          if git diff --cached --quiet; then
+            echo "No summary changes."
+          else
+            git commit -m "chore(swarm): refresh context summary"
+            git push
+          fi
+
+
+5) HOSTING ON RENDER (OR SIMILAR)
+---------------------------------
+- Build: npm ci && npm run build
+- Start: npm run start
+- Env vars: OPENAI_API_KEY, AGENT_SERVICE_TOKEN, WEBHOOK_SECRET, DEFAULT_REPO=DevinBristol/DevinSwarm, (optional) GH_PAT
+- After deploy, verify:
+  curl -s https://<service>/healthz
+  curl -s "https://<service>/context?repo=DevinBristol/DevinSwarm"
+
+- (Optional but recommended) GitHub Webhook → https://<service>/webhooks/github with the WEBHOOK_SECRET for events:
+  Issues, Issue Comment, Pull Request, Workflow Run.
+
+
+6) END‑TO‑END VERIFICATION
+--------------------------
+6.1 Open a PR that edits any Apex class under force-app; confirm “PR Validate (Salesforce)” runs and comments.
+6.2 Force a failing validation → ensure “CI Failure → Issue” opens/updates an Issue.
+6.3 Comment `/plan` on that Issue. Expect a Manager plan and parallel Worker outputs as a reply.
+6.4 Check `.swarm/state.json` updated (lastRuns appended). If not, inspect service logs.
+6.5 GET /context returns the same state in JSON (no secrets).
+
+
+7) TROUBLESHOOTING QUICK HITS
+-----------------------------
+- “Resource not accessible by integration” (403): set repo **Workflow permissions** to **Read and write** and ensure workflow `permissions:` include `issues: write` and `pull-requests: write`.
+- “NothingToDeploy”: README changes don’t deploy to Salesforce. Change Apex or metadata under `force-app/**`.
+- InvalidIdLengthError on test run: avoid passing `--test-run-id` unless you have a valid 15/18-char id; use `RunLocalTests`.
+- Render can’t comment on PRs: missing GH_PAT or rely on Actions to post comments instead (already configured).
+
+
+8) BRANCH & PR CONVENTIONS
+--------------------------
+- Branch names: feature/<short-name>, fix/<short-name>, swarm/<automation>
+- PR template: ensure checklist includes tests, docs, budget/time spent (if available).
+- Labels: intake, ci-failure, scope-change, needs-attention.
+
+
+9) ASK CODEx TO ADVISE & ADJUST (DO THIS FIRST)
+-----------------------------------------------
+Before making any changes:
+- Read the repository tree and existing workflows/service code.
+- Compare to this direction file and write **ADJUSTMENT:** notes inline where the live repo differs (filenames, paths, build scripts).
+- Propose minimal diffs (patches) instead of full rewrites.
+- Where conflicts exist (e.g., different service structure), adapt the route/snapshot code accordingly and document the adaptation inline.
+- After implementation, post a short verification plan as a PR comment and run it.
+
+Deliverables:
+- A branch `swarm-bootstrap` with commits that add/update the files above.
+- A successful deployment of the Agent Service with a public **/context**.
+- A passing PR validation and a working `/plan` comment round trip.
