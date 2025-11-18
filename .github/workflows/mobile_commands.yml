@@ -27,9 +27,13 @@ jobs:
           const fs = require('fs');
           const eventPath = process.env.GITHUB_EVENT_PATH;
           const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+          const issueNumber = (payload.issue && payload.issue.number) ||
+                              (payload.pull_request && payload.pull_request.number) ||
+                              0;
           const body = {
             type: "comment",
             repo: process.env.GITHUB_REPOSITORY,
+            issueNumber,
             payload
           };
           fs.writeFileSync('payload.json', JSON.stringify(body));
