@@ -1,3 +1,3 @@
-Run dd52c5e8-b773-4498-9364-ffd7b659e5db
+Run 69132c69-dcc3-4ec4-991e-99d8ef0b4e7a
 
-Design and scaffold a v3 DevinSwarm framework that co-exists with the current stack. Follow CODEx runbook conventions, derive lessons from v1/v2, but create new v3-specific docs, state classes, workers, prompts, etc. Never modify or rename existing v1/v2 files until v3 is stable-work in parallel directories and document a cutover plan.
+Research and draft a feature path for Salesforce development that will eventually plug into the orchestrator, but do not touch the framework yet. Produce documentation covering integration touchpoints, required credentials, data flow, and milestones.
