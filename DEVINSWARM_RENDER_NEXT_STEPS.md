@@ -1,6 +1,6 @@
-# DevinSwarm Render v2 – Next Steps Cheat Sheet
+# DevinSwarm Render v2 — Next Steps Cheat Sheet
 
-This file captures where the bootstrap left off and what to do once GitHub’s server issues (500/502 on `git push`) are resolved.
+This file captures how to run DevinSwarm locally and on Render now that the service, worker, and GitHub App path are all working (runs reach `done` and open PRs).
 
 ## Context Snapshot
 
@@ -17,7 +17,7 @@ This file captures where the bootstrap left off and what to do once GitHub’s s
 - GitHub App is set up with:
   - `GITHUB_APP_ID=2314650`
   - `GITHUB_INSTALLATION_ID=95392227`
-  - `GITHUB_PRIVATE_KEY` stored in `.env` as a single line with `\n` escapes.
+  - `GITHUB_PRIVATE_KEY` stored in `.env` as a single line with `\n` escapes (no surrounding quotes).
   - `GITHUB_WEBHOOK_SECRET=placeholder_123456789`
 - `.env` (local only, not committed) also includes:
   - `OPENAI_API_KEY=<your OpenAI key>`
@@ -27,9 +27,9 @@ This file captures where the bootstrap left off and what to do once GitHub’s s
   - `ALLOWED_REPOS=DevinBristol/DevinSwarm`
   - `UI_TOKEN=placeholder_123456789`
 
-If this file exists, the repo is already migrated to the new stack; you mainly need to push and configure Render.
+If this file exists, the repo is already migrated to the new stack; use it as the quick start for both local dev and Render.
 
-## Local Dev – How to Re-Run
+## Local Dev — How to Re-Run
 
 From `C:\Users\Devin\IdeaProjects\Swarm`:
 
@@ -58,83 +58,84 @@ Invoke-RestMethod http://localhost:3000/intake `
 
 Then open `http://localhost:3000/ui` in a browser.
 
-## When GitHub Push Starts Working Again
+## Render — Stack and Config (already applied)
 
-1. **Push `main`**
-   ```powershell
-   git push origin main
-   ```
+Render is already configured via `infra/render.yaml` as a Blueprint:
 
-2. **Create Render Blueprint (v2 stack)**
-   - In Render:
-     - New → Blueprint.
-     - Select repo: `DevinBristol/DevinSwarm`.
-     - Blueprint path: `infra/render.yaml`.
-   - Render should propose:
-     - Web service: `devinswarm-service`
-     - Worker: `devinswarm-worker`
-     - Keyvalue: `devinswarm-kv`
-     - Postgres: `devinswarm-postgres`
+- Web service: `devinswarm-service` (runs `npm run start:service`).
+- Worker: `devinswarm-worker` (runs `npm run start:worker`).
+- Keyvalue: `devinswarm-kv` (provides `REDIS_URL`).
+- Postgres: `devinswarm-postgres` (provides `DATABASE_URL`).
 
-3. **Set env vars in Render (web + worker)**
+For **both** `devinswarm-service` and `devinswarm-worker`:
 
-   For **both** `devinswarm-service` and `devinswarm-worker`:
+- `OPENAI_API_KEY` = same as in `.env`.
+- `GITHUB_APP_ID` = `2314650`
+- `GITHUB_INSTALLATION_ID` = `95392227`
+- `GITHUB_PRIVATE_KEY` = exactly the same string as in `.env` (one line, `\n`-escaped, no surrounding quotes).
+- `GITHUB_WEBHOOK_SECRET` = `placeholder_123456789`
+- Optionally override:
+  - `DAILY_BUDGET_USD` (e.g. `75`)
+  - `AUTO_MERGE_LOW_RISK` (`true`/`false`)
+  - `ALLOWED_REPOS` (e.g. `DevinBristol/DevinSwarm`)
 
-   - `OPENAI_API_KEY` = same as in `.env`.
-   - `GITHUB_APP_ID` = `2314650`
-   - `GITHUB_INSTALLATION_ID` = `95392227`
-   - `GITHUB_PRIVATE_KEY` = exactly the same string as in `.env` (one line, `\n`-escaped).
-   - `GITHUB_WEBHOOK_SECRET` = `placeholder_123456789`
-   - Optionally override:
-     - `DAILY_BUDGET_USD` (e.g. `75`)
-     - `AUTO_MERGE_LOW_RISK` (`true`/`false`)
-     - `ALLOWED_REPOS` (e.g. `DevinBristol/DevinSwarm`)
+Additionally for **web service** (`devinswarm-service`):
 
-   Additionally for **web service** (`devinswarm-service`):
+- `UI_TOKEN` = `placeholder_123456789` (or a stronger secret if you change it locally).
 
-   - `UI_TOKEN` = `placeholder_123456789` (or a stronger secret if you change it locally).
+Do **not** override:
 
-   Do **not** override:
+- `DATABASE_URL` (comes from `devinswarm-postgres`).
+- `REDIS_URL` (comes from `devinswarm-kv`).
 
-   - `DATABASE_URL` (comes from `devinswarm-postgres`).
-   - `REDIS_URL` (comes from `devinswarm-kv`).
+## Remote Smoke Test on Render
 
-4. **Apply the Blueprint**
-   - Click “Apply Blueprint” in Render.
-   - Wait until:
-     - `devinswarm-service` is “Live”.
-     - `devinswarm-worker` is “Live”.
+From your machine:
 
-5. **Update GitHub App webhook**
-   - Get the public URL of `devinswarm-service` from Render, e.g.:
-     - `https://devinswarm-service.onrender.com`
-   - In GitHub App settings:
-     - Webhook URL: `https://<service-url>/webhooks/github`
-     - Webhook secret: `placeholder_123456789` (same as env).
+```powershell
+# Health
+Invoke-RestMethod https://<service-url>/health
 
-6. **Remote Smoke Test on Render**
+# Env debug (requires UI token)
+Invoke-RestMethod https://<service-url>/debug/env `
+  -Headers @{ "x-ui-token" = "placeholder_123456789" }
 
-   From your machine:
+# Intake
+Invoke-RestMethod https://<service-url>/intake `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body '{"repo":"DevinBristol/DevinSwarm","description":"Render smoke test"}'
+```
 
-   ```powershell
-   # Health
-   Invoke-RestMethod https://<service-url>/health
+Then:
 
-   # Intake
-   Invoke-RestMethod https://<service-url>/intake `
-     -Method Post `
-     -ContentType "application/json" `
-     -Body '{"repo":"DevinBristol/DevinSwarm","description":"Render smoke test"}'
-   ```
+- Visit `https://<service-url>/ui` in your browser:
+  - Confirm the new run shows up and eventually reaches `done`.
+- Check GitHub (`DevinBristol/DevinSwarm`):
+  - Look for a new branch `swarm/run-...` and a PR titled `Swarm: ...`.
 
-   Then:
+## HITL / Unblock Paths
 
-   - Visit `https://<service-url>/ui` in your browser:
-     - Confirm the new run shows up.
-   - Check GitHub (`DevinBristol/DevinSwarm`):
-     - Look for a new branch `swarm/run-...` and a PR titled `Swarm: ...`.
+To test human-in-the-loop behavior on Render:
 
-## If Render Fails During Deploy
+1. Trigger a run that will block (e.g. temporarily change `ALLOWED_REPOS` to something else, deploy, and run `/intake`).
+2. Watch `/ui` and confirm the run reaches `awaiting_unblock` with a `blockedReason`.
+3. Use `/runs/:id/unblock` via the UI button to move it back to `running` and then `done`.
+4. Optionally wire the GitHub App webhook (below) and test unblocking via issues.
+
+## GitHub App Webhook
+
+1. Get the public URL of `devinswarm-service` from Render, e.g.:
+   - `https://devinswarm-service.onrender.com`
+2. In GitHub App settings:
+   - Webhook URL: `https://<service-url>/webhooks/github`
+   - Webhook secret: `placeholder_123456789` (same as env).
+3. To unblock from GitHub:
+   - Open an issue with a title containing `run <run-id>` and label `unblocked`, **or**
+   - Comment `/unblock` on an issue with that title.
+   - The webhook will move the corresponding run to `running` and clear `blockedReason`.
+
+## If Render Fails
 
 - Check service logs in Render for:
   - `ECONNREFUSED` to Redis/Postgres (means wiring is wrong).
@@ -146,5 +147,4 @@ Then open `http://localhost:3000/ui` in a browser.
     - `https://github.com/settings/installations/<ID>`
   - `ALLOWED_REPOS` contains `DevinBristol/DevinSwarm`.
 
-Use this file as the quick checklist to resume work if the dev environment crashes or you pick this up later.
-
+Use this file as the quick checklist to resume work if the dev environment crashes or you pick this up later, whether you are on your work PC or home PC.

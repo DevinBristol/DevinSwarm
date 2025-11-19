@@ -10,6 +10,14 @@ DevinSwarm is a Node 20+ TypeScript repo built around the orchestrator-first des
 - `docker compose -f docker-compose.dev.yml up -d redis` – start the local Redis queue.
 - `npm run start:service` / `npm run start:dev-worker` – run the compiled HTTP service and dev worker to confirm `intake → plan → assign → report`.
 
+### Local Dev Dependencies (PC-to-PC Checklist)
+- Node `20.19.0` (honor `.nvmrc`; use `nvm use` or `fnm use` where available).
+- npm `>=10` (run `npm --version` to confirm).
+- Docker Desktop with Compose (`docker compose version` should succeed).
+- A `.env` file copied from `.env.example` and updated with machine-specific secrets (never committed).
+- Local Postgres/Redis via `docker compose -f infra/docker-compose.dev.yml up -d` before running workers or service.
+- After switching machines: run `npm ci` once, then `npm run db:push` to ensure Prisma schema is applied.
+
 ## Coding Style & Naming Conventions
 Follow `.editorconfig`: 2-space indent, LF, newline at EOF. Use strict TypeScript, ES modules, alphabetized imports, and `async` functions returning typed `Promise`s. Keep directories/file names `kebab-case`, exported types `PascalCase`, functions/vars `camelCase`, and env vars `SCREAMING_SNAKE_CASE`. Validate inputs with `zod` in `/orchestrator/state`, share constants through `/runtime/store`, and log via `winston`.
 
