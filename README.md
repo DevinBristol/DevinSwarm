@@ -105,6 +105,19 @@ The workflow at `.github/workflows/ci.yml`:
 
 Later steps in the runbook will extend this to run tests, linters, and security checks, and wire reviewer/ops workers and branch protections.
 
+## Working Across Work/Home PCs
+
+To move seamlessly between machines:
+
+- Make sure each PC has Node 20.19.0, npm ≥ 10, and Docker Desktop with Compose.
+- On each PC, copy `.env.example` to `.env` and fill in secrets locally (do not commit `.env`).
+- After switching machines, run:
+  - `git pull origin main`
+  - `npm ci` (if `package-lock.json` changed)
+  - `docker compose -f infra/docker-compose.dev.yml up -d`
+  - `npm run db:push`
+- Then use the local dev commands above or the Render smoke tests from `DEVINSWARM_RENDER_NEXT_STEPS.md`.
+
 ## DevinSwarm Bootstrap
 
 This repo contains a multi-agent swarm with:
