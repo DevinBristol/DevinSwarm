@@ -1,3 +1,3 @@
-Run 8b75ac38-b4f9-4076-928f-3fff63818e58
+Run a43faf25-abe5-43f2-ae60-995c0ade1376
 
-Render smoke test triggered from CLI
+Render smoke test after HITL wiring
