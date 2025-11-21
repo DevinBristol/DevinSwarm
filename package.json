@@ -11,8 +11,8 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "lint": "echo 'add eslint later'",
-    "dev": "nodemon service/index.ts",
-    "start:dev-worker": "tsx workers/dev/worker.ts"
+    "dev": "nodemon apps/service/src/server.ts",
+    "start:dev-worker": "npm run start:worker"
   },
   "engines": {
     "node": ">=20 <21",
@@ -32,7 +32,6 @@
     "@octokit/core": "^6.1.2",
     "@octokit/rest": "^21.0.0",
     "@prisma/client": "^5.21.1",
-    "better-sqlite3": "^11.7.0",
     "bullmq": "^5.7.7",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",

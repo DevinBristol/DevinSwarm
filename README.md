@@ -12,53 +12,30 @@ This repo follows the `CODEx_RUNBOOK.md` plan, evolving toward:
 
 ## Local Development
 
-Prerequisites:
-
-- Node.js >= 20
-- npm
-- Docker (for Redis in dev)
-
-Install dependencies:
+Prerequisites: Node.js >= 20, npm >= 10, Docker Desktop with Compose.
 
 ```bash
-npm install
-```
-
-Create an env file:
-
-```bash
+# install deps and copy the env template
+npm ci
 cp .env.example .env
+
+# start Postgres + Redis (Docker)
+docker compose -f infra/docker-compose.dev.yml up -d
+
+# generate Prisma client + ensure schema applied
+npm run db:generate
+npm run db:push
+
+# run the service and worker (separate terminals)
+npm run start:service   # http://localhost:3000/ui
+npm run start:worker
 ```
 
-Fill in at least:
+Fill in `.env` with at least:
 
-- `OPENAI_API_KEY` – your OpenAI key (do not commit it).
+- `OPENAI_API_KEY` — your OpenAI key (do not commit it).
+- `DATABASE_URL=postgresql://devinswarm:devinswarm@localhost:5432/devinswarm?schema=public`
 - `REDIS_URL=redis://localhost:6379`
-- `SQLITE_URL=devinswarm.db`
-
-Start Redis locally:
-
-```bash
-docker compose -f docker-compose.dev.yml up -d redis
-```
-
-Build the project:
-
-```bash
-npm run build
-```
-
-Run the HTTP service:
-
-```bash
-npm run start:service
-```
-
-Run the dev worker in another terminal:
-
-```bash
-npm run start:dev-worker
-```
 
 Trigger a dummy run:
 
@@ -76,25 +53,27 @@ curl http://localhost:3000/runs/<id>
 
 ## Cloud Deployment (Render)
 
-This repo includes a `render.yaml` that defines:
+This repo includes a root `render.yaml` that defines:
 
 - A **web service** (`devinswarm-service`) running `npm run start:service`.
-- A **worker service** (`devinswarm-dev-worker`) running `npm run start:dev-worker`.
+- A **worker service** (`devinswarm-worker`) running `npm run start:worker`.
 
 High‑level steps:
 
 1. Push this repo to GitHub (e.g., `DevinBristol/DevinSwarm`).
 2. In Render, create a new Web Service from this repo:
-   - Use the config from `render.yaml`.
+   - Use the config from the root `render.yaml`.
 3. In Render, create a Worker Service from the same repo:
-   - Use the `devinswarm-dev-worker` entry in `render.yaml`.
+   - Use the `devinswarm-worker` entry in `render.yaml`.
 4. Provide environment variables in Render for both services:
    - `OPENAI_API_KEY`
-   - `REDIS_URL` (pointing at a Render Redis instance)
-   - `SQLITE_URL` or, later, `POSTGRES_URL` when we add Postgres.
-   - `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` once the GitHub App is set up.
+   - `REDIS_URL` (from a Render Redis/Key-Value instance)
+   - `DATABASE_URL` (from a Render Postgres database)
+   - `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`
+   - `DAILY_BUDGET_USD`, `AUTO_MERGE_LOW_RISK`, `ALLOWED_REPOS`
+   - `UI_TOKEN`
 
-With those in place, the Render web + worker services give you a 24/7 cloud‑hosted DevinSwarm that can process jobs from the Redis queue.
+With those in place, the Render web + worker services give you a 24/7 cloud-hosted DevinSwarm that can process jobs from the Redis queue.
 
 ## CI
 
@@ -143,7 +122,7 @@ npm run start:worker
 
 ### Render deployment
 
-Use `infra/render.yaml` as a Blueprint in Render. Set the following environment variables in the Render dashboard (do not commit secrets):
+Use the root `render.yaml` as a Blueprint in Render. Set the following environment variables in the Render dashboard (do not commit secrets):
 
 - `OPENAI_API_KEY`
 - `GITHUB_APP_ID`

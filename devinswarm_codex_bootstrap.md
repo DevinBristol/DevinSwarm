@@ -5,7 +5,7 @@
 - Add Node/TypeScript toolchain, Postgres (Prisma), Redis queue (BullMQ)
 - Add web service (`/health`, `/intake`, `/runs`, `/ui`)
 - Add background worker (Dev worker) and Scout worker
-- Wire Render (web + worker + Key Value + Postgres) via `infra/render.yaml`
+- Wire Render (web + worker + Key Value + Postgres) via root `render.yaml`
 - Enable GitHub App auth for direct repo read/write
 - Default to OpenAI
 - Enforce daily budget + low‑risk auto‑merge scaffold
@@ -127,7 +127,7 @@ GITHUB_WEBHOOK_SECRET=
 
 # Datastores (local dev via Docker; Render injects its own)
 REDIS_URL=redis://localhost:6379
-DATABASE_URL=postgresql://swarm:swarm@localhost:5432/swarm?schema=public
+DATABASE_URL=postgresql://devinswarm:devinswarm@localhost:5432/devinswarm?schema=public
 
 # Policy
 AUTO_MERGE_LOW_RISK=true
@@ -636,7 +636,7 @@ Commit:
 
 7.1 **Create folder `infra`** if it doesn’t exist.
 
-7.2 **Create `infra/render.yaml`** with:
+7.2 **Create root `render.yaml`** with:
 
 ```yaml
 services:
@@ -757,7 +757,7 @@ npm run start:worker
 
 ### Render deployment
 
-Use `infra/render.yaml` as a Blueprint in Render. Set the following environment variables in the Render dashboard (do not commit secrets):
+Use the root `render.yaml` as a Blueprint in Render. Set the following environment variables in the Render dashboard (do not commit secrets):
 
 - `OPENAI_API_KEY`
 - `GITHUB_APP_ID`
@@ -789,4 +789,4 @@ curl -s -X POST http://localhost:3000/intake   -H "Content-Type: application/jso
 
 5. Confirm `/ui` renders a table of runs in a browser.
 
-When all of this works locally, the repo is ready for Render Blueprint deployment using `infra/render.yaml`.
+When all of this works locally, the repo is ready for Render Blueprint deployment using the root `render.yaml`.
