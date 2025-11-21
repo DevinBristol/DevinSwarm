@@ -95,12 +95,12 @@ export const orchestratorGraph = graphBuilder.compile({
 });
 
 export async function runDevWorkflow(
-  input: RunInput & { id: string },
+  input: RunInput & { id: string; planSummary?: string | null },
 ): Promise<OrchestratorStateType> {
   const initialState: OrchestratorStateType = {
     runId: input.id,
     description: input.description,
-    planSummary: null,
+    planSummary: input.planSummary ?? null,
     status: "queued",
     logs: [],
   };

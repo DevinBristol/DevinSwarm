@@ -3,6 +3,8 @@ import { PrismaClient } from "@prisma/client";
 import { ghInstallClient } from "../../../packages/shared/github";
 import { ALLOWED_REPOS, AUTO_MERGE_LOW_RISK } from "../../../packages/shared/policy";
 import { evaluateHitl } from "../../../orchestrator/policies/hitl";
+import { runOrchestratorForRun } from "../../../orchestrator";
+import { createWorkspace, cleanupWorkspace, WorkspacePaths } from "../../../tools/fs";
 
 const prisma = new PrismaClient();
 const gh = ghInstallClient();
@@ -34,6 +36,18 @@ makeWorker(
     const run = await prisma.run.findUnique({ where: { id: runId } });
     if (!run) return;
 
+    let workspace: WorkspacePaths | null = null;
+
+    try {
+      workspace = createWorkspace(runId);
+      await prisma.event.create({
+        data: { runId, type: "workspace:init", payload: { root: workspace.root, tempDir: workspace.tempDir } },
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[dev] failed to init workspace for run ${runId}:`, err);
+    }
+
     if (!ALLOWED_REPOS.has(run.repo)) {
       await prisma.$transaction([
       prisma.run.update({
@@ -51,6 +65,21 @@ makeWorker(
       }),
     ]);
       throw new Error(`Repo not allowed: ${run.repo}`);
+    }
+
+    try {
+      await runOrchestratorForRun(
+        { prisma },
+        {
+          id: runId,
+          description: run.description ?? "",
+          planSummary: run.title ?? null,
+        },
+      );
+    } catch (err) {
+      // orchestration logs shouldn't block dev worker
+      // eslint-disable-next-line no-console
+      console.warn(`[dev] orchestration logging failed for run ${runId}:`, err);
     }
 
     // Evaluate HITL before starting if required secrets are missing.
@@ -223,9 +252,18 @@ makeWorker(
                 type: "hitl:pending",
                 payload: { note: "Awaiting unblock after failure" },
               },
-            }),
+        }),
       ]);
       throw err;
+    } finally {
+      if (workspace) {
+        cleanupWorkspace(workspace);
+        await prisma.event.create({
+          data: { runId, type: "workspace:cleanup", payload: { root: workspace.root } },
+        }).catch(() => {
+          /* best effort cleanup */
+        });
+      }
     }
   },
   2,
