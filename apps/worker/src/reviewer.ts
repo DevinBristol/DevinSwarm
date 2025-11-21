@@ -1,10 +1,14 @@
-import { makeWorker, opsQueue } from "../../../packages/shared/queue";
 import { PrismaClient } from "@prisma/client";
-import { ALLOWED_REPOS } from "../../../packages/shared/policy";
 import { evaluateHitl } from "../../../orchestrator/policies/hitl";
+import { ALLOWED_REPOS } from "../../../packages/shared/policy";
+import { makeWorker, opsQueue } from "../../../packages/shared/queue";
+import { createPrComment, ghInstallClient, setCommitStatus } from "../../../packages/shared/github";
 import { runTests } from "../../../tools/tests";
 
 const prisma = new PrismaClient();
+
+const reviewerCommand = process.env.REVIEWER_COMMAND ?? "npm run build";
+const reviewStatusContext = process.env.REVIEW_STATUS_CONTEXT ?? "swarm/review";
 
 // Light env snapshot for debugging (no secrets).
 // eslint-disable-next-line no-console
@@ -20,7 +24,33 @@ console.log("Reviewer worker env snapshot", {
   DAILY_BUDGET_USD: process.env.DAILY_BUDGET_USD ?? null,
   AUTO_MERGE_LOW_RISK: process.env.AUTO_MERGE_LOW_RISK ?? null,
   ALLOWED_REPOS: process.env.ALLOWED_REPOS ?? null,
+  REVIEWER_COMMAND: reviewerCommand,
+  REVIEW_STATUS_CONTEXT: reviewStatusContext,
 });
+
+let gh = null as ReturnType<typeof ghInstallClient> | null;
+try {
+  gh = ghInstallClient();
+} catch {
+  gh = null;
+}
+
+const truncate = (text: string, limit = 2000): string =>
+  text.length > limit ? `${text.slice(0, limit)}\n...[truncated]` : text;
+
+const getHeadSha = async (owner: string, repo: string, branch?: string): Promise<string | null> => {
+  if (!gh || !branch) return null;
+  try {
+    const result = await gh.request("GET /repos/{owner}/{repo}/branches/{branch}", {
+      owner,
+      repo,
+      branch,
+    });
+    return (result.data as any)?.commit?.sha ?? null;
+  } catch {
+    return null;
+  }
+};
 
 makeWorker(
   "review",
@@ -38,6 +68,10 @@ makeWorker(
 
     const targetRepo = repo ?? run.repo;
     const attempt = typeof job.attemptsMade === "number" ? job.attemptsMade + 1 : 1;
+    const [owner, repoName] = targetRepo.split("/");
+    const branchName = branch ?? run.branch ?? null;
+    const prNum = prNumber ?? run.prNumber ?? null;
+    const commitSha = await getHeadSha(owner, repoName, branchName ?? undefined);
 
     try {
       if (!ALLOWED_REPOS.has(targetRepo)) {
@@ -67,29 +101,64 @@ makeWorker(
           data: {
             runId,
             type: "review:start",
-            payload: { branch: branch ?? run.branch, prNumber: prNumber ?? run.prNumber },
+            payload: { branch: branchName, prNumber: prNum },
           },
         }),
       ]);
 
-      const tests = await runTests("npm test -- --watch=false", { cwd: process.cwd() });
+      if (commitSha) {
+        await setCommitStatus(gh, {
+          owner,
+          repo: repoName,
+          sha: commitSha,
+          state: "pending",
+          context: reviewStatusContext,
+          description: "Reviewer checks running",
+        });
+      }
+
+      const tests = await runTests(reviewerCommand, { cwd: process.cwd() });
+      const trimmedOutput = truncate(tests.output);
+
       await prisma.event.create({
         data: {
           runId,
           type: "review:tests",
-          payload: { success: tests.success, output: tests.output },
+          payload: { success: tests.success, output: trimmedOutput },
         },
       });
 
-      // Stub review worker: log and hand off to ops. Extend with tests/linters and PR comments later.
-      // eslint-disable-next-line no-console
-      console.log(`[review] stub processed run ${runId} for ${targetRepo}`);
+      if (commitSha) {
+        await setCommitStatus(gh, {
+          owner,
+          repo: repoName,
+          sha: commitSha,
+          state: tests.success ? "success" : "failure",
+          context: reviewStatusContext,
+          description: tests.success ? "Reviewer checks passed" : "Reviewer checks failed",
+        });
+      }
+
+      if (prNum && gh) {
+        await createPrComment(gh, {
+          owner,
+          repo: repoName,
+          pullNumber: prNum,
+          body: tests.success
+            ? `✅ Reviewer checks passed for run ${runId}.\n\nCommand: \`${reviewerCommand}\`\n\nLogs:\n\`\`\`\n${trimmedOutput}\n\`\`\``
+            : `❌ Reviewer checks failed for run ${runId}.\n\nCommand: \`${reviewerCommand}\`\n\nLogs:\n\`\`\`\n${trimmedOutput}\n\`\`\`\n\nPlease unblock or rerun after addressing failures.`,
+        });
+      }
+
+      if (!tests.success) {
+        throw new Error("Reviewer checks failed");
+      }
 
       await prisma.event.create({
         data: {
           runId,
           type: "review:completed",
-          payload: { branch: branch ?? run.branch, prNumber: prNumber ?? run.prNumber },
+          payload: { branch: branchName, prNumber: prNum },
         },
       });
       await prisma.run.update({
@@ -99,10 +168,21 @@ makeWorker(
       await opsQueue.add("ops.start", {
         runId,
         repo: targetRepo,
-        branch: branch ?? run.branch,
-        prNumber: prNumber ?? run.prNumber,
+        branch: branchName ?? undefined,
+        prNumber: prNum ?? undefined,
       });
     } catch (err: any) {
+      if (commitSha) {
+        await setCommitStatus(gh, {
+          owner,
+          repo: repoName,
+          sha: commitSha,
+          state: "failure",
+          context: reviewStatusContext,
+          description: "Reviewer checks failed",
+        });
+      }
+
       const hitlDecision = evaluateHitl({
         failedTestAttempts: attempt,
         explicitReason: err?.response?.data?.message ? String(err.response.data.message) : undefined,

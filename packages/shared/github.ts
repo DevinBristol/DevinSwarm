@@ -28,3 +28,42 @@ export function ghInstallClient(): Octokit {
     auth: { appId, privateKey, installationId: Number(installationId) },
   });
 }
+
+export interface CommitStatusInput {
+  owner: string;
+  repo: string;
+  sha: string;
+  state: "error" | "failure" | "pending" | "success";
+  context: string;
+  description?: string;
+  targetUrl?: string;
+}
+
+export async function setCommitStatus(
+  client: Octokit | null,
+  input: CommitStatusInput,
+): Promise<void> {
+  if (!client) return;
+  await client.request("POST /repos/{owner}/{repo}/statuses/{sha}", {
+    owner: input.owner,
+    repo: input.repo,
+    sha: input.sha,
+    state: input.state,
+    context: input.context,
+    description: input.description?.slice(0, 140),
+    target_url: input.targetUrl,
+  });
+}
+
+export async function createPrComment(
+  client: Octokit | null,
+  input: { owner: string; repo: string; pullNumber: number; body: string },
+): Promise<void> {
+  if (!client) return;
+  await client.request("POST /repos/{owner}/{repo}/issues/{issue_number}/comments", {
+    owner: input.owner,
+    repo: input.repo,
+    issue_number: input.pullNumber,
+    body: input.body,
+  });
+}

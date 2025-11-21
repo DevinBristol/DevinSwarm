@@ -1,10 +1,14 @@
-import { makeWorker } from "../../../packages/shared/queue";
 import { PrismaClient } from "@prisma/client";
-import { ALLOWED_REPOS } from "../../../packages/shared/policy";
 import { evaluateHitl } from "../../../orchestrator/policies/hitl";
+import { ALLOWED_REPOS } from "../../../packages/shared/policy";
+import { makeWorker } from "../../../packages/shared/queue";
+import { createPrComment, ghInstallClient, setCommitStatus } from "../../../packages/shared/github";
 import { runTests } from "../../../tools/tests";
 
 const prisma = new PrismaClient();
+
+const opsCommand = process.env.OPS_COMMAND ?? "npm run build";
+const opsStatusContext = process.env.OPS_STATUS_CONTEXT ?? "swarm/ops";
 
 // Light env snapshot for debugging (no secrets).
 // eslint-disable-next-line no-console
@@ -20,7 +24,33 @@ console.log("Ops worker env snapshot", {
   DAILY_BUDGET_USD: process.env.DAILY_BUDGET_USD ?? null,
   AUTO_MERGE_LOW_RISK: process.env.AUTO_MERGE_LOW_RISK ?? null,
   ALLOWED_REPOS: process.env.ALLOWED_REPOS ?? null,
+  OPS_COMMAND: opsCommand,
+  OPS_STATUS_CONTEXT: opsStatusContext,
 });
+
+let gh = null as ReturnType<typeof ghInstallClient> | null;
+try {
+  gh = ghInstallClient();
+} catch {
+  gh = null;
+}
+
+const truncate = (text: string, limit = 2000): string =>
+  text.length > limit ? `${text.slice(0, limit)}\n...[truncated]` : text;
+
+const getHeadSha = async (owner: string, repo: string, branch?: string): Promise<string | null> => {
+  if (!gh || !branch) return null;
+  try {
+    const result = await gh.request("GET /repos/{owner}/{repo}/branches/{branch}", {
+      owner,
+      repo,
+      branch,
+    });
+    return (result.data as any)?.commit?.sha ?? null;
+  } catch {
+    return null;
+  }
+};
 
 makeWorker(
   "ops",
@@ -38,6 +68,10 @@ makeWorker(
 
     const targetRepo = repo ?? run.repo;
     const attempt = typeof job.attemptsMade === "number" ? job.attemptsMade + 1 : 1;
+    const [owner, repoName] = targetRepo.split("/");
+    const branchName = branch ?? run.branch ?? null;
+    const prNum = prNumber ?? run.prNumber ?? null;
+    const commitSha = await getHeadSha(owner, repoName, branchName ?? undefined);
 
     try {
       if (!ALLOWED_REPOS.has(targetRepo)) {
@@ -67,24 +101,60 @@ makeWorker(
           data: {
             runId,
             type: "ops:start",
-            payload: { branch: branch ?? run.branch, prNumber: prNumber ?? run.prNumber },
+            payload: { branch: branchName, prNumber: prNum },
           },
         }),
       ]);
 
-      const statusCheck = await runTests("npm run build", { cwd: process.cwd() });
+      if (commitSha) {
+        await setCommitStatus(gh, {
+          owner,
+          repo: repoName,
+          sha: commitSha,
+          state: "pending",
+          context: opsStatusContext,
+          description: "Ops checks running",
+        });
+      }
+
+      const statusCheck = await runTests(opsCommand, { cwd: process.cwd() });
+      const trimmedOutput = truncate(statusCheck.output);
+
       await prisma.event.create({
         data: {
           runId,
           type: "ops:status",
-          payload: { success: statusCheck.success, output: statusCheck.output },
+          payload: { success: statusCheck.success, output: trimmedOutput },
         },
       });
 
-      // Stub ops worker: log and mark run complete. Extend with CI/status gating and merge logic later.
-      // eslint-disable-next-line no-console
-      console.log(`[ops] stub processed run ${runId} for ${targetRepo}`);
+      if (commitSha) {
+        await setCommitStatus(gh, {
+          owner,
+          repo: repoName,
+          sha: commitSha,
+          state: statusCheck.success ? "success" : "failure",
+          context: opsStatusContext,
+          description: statusCheck.success ? "Ops checks passed" : "Ops checks failed",
+        });
+      }
 
+      if (prNum && gh) {
+        await createPrComment(gh, {
+          owner,
+          repo: repoName,
+          pullNumber: prNum,
+          body: statusCheck.success
+            ? `✅ Ops checks passed for run ${runId}.\n\nCommand: \`${opsCommand}\`\n\nLogs:\n\`\`\`\n${trimmedOutput}\n\`\`\``
+            : `❌ Ops checks failed for run ${runId}.\n\nCommand: \`${opsCommand}\`\n\nLogs:\n\`\`\`\n${trimmedOutput}\n\`\`\`\n\nPlease unblock or rerun after addressing failures.`,
+        });
+      }
+
+      if (!statusCheck.success) {
+        throw new Error("Ops checks failed");
+      }
+
+      // Guard next state to leave merge control manual for now.
       await prisma.$transaction([
         prisma.run.update({
           where: { id: runId },
@@ -93,6 +163,17 @@ makeWorker(
         prisma.event.create({ data: { runId, type: "ops:completed", payload: {} } }),
       ]);
     } catch (err: any) {
+      if (commitSha) {
+        await setCommitStatus(gh, {
+          owner,
+          repo: repoName,
+          sha: commitSha,
+          state: "failure",
+          context: opsStatusContext,
+          description: "Ops checks failed",
+        });
+      }
+
       const hitlDecision = evaluateHitl({
         failedTestAttempts: attempt,
         explicitReason: err?.response?.data?.message ? String(err.response.data.message) : undefined,
