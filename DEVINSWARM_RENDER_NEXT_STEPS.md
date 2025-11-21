@@ -10,7 +10,7 @@ This file captures how to run DevinSwarm locally and on Render now that the serv
   - Scout worker at `apps/scout/src/scout.ts`.
   - Prisma schema at `prisma/schema.prisma` backed by Postgres.
   - Shared helpers at `packages/shared/*` (policy, GitHub App client, queue).
-  - Infra v2 at `infra/docker-compose.dev.yml` and `infra/render.yaml`.
+  - Infra v2 at `infra/docker-compose.dev.yml` and root `render.yaml`.
 - Local smoke test is working:
   - `npm run start:service` + `npm run start:worker` + local Redis/Postgres.
   - `/health`, `/intake`, and `/ui` all behave as expected.
@@ -60,7 +60,7 @@ Then open `http://localhost:3000/ui` in a browser.
 
 ## Render — Stack and Config (already applied)
 
-Render is already configured via `infra/render.yaml` as a Blueprint:
+Render is already configured via the root `render.yaml` as a Blueprint:
 
 - Web service: `devinswarm-service` (runs `npm run start:service`).
 - Worker: `devinswarm-worker` (runs `npm run start:worker`).
@@ -130,7 +130,8 @@ To test human-in-the-loop behavior on Render:
 2. In GitHub App settings:
    - Webhook URL: `https://<service-url>/webhooks/github`
    - Webhook secret: `placeholder_123456789` (same as env).
-3. To unblock from GitHub:
+3. To unblock from GitHub:3
+4. 
    - Open an issue with a title containing `run <run-id>` and label `unblocked`, **or**
    - Comment `/unblock` on an issue with that title.
    - The webhook will move the corresponding run to `running` and clear `blockedReason`.

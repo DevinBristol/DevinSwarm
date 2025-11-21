@@ -4,6 +4,13 @@
 
 ---
 
+> **Current v2 stack (canonical):**
+> - Durable state is Postgres via Prisma using `DATABASE_URL` (no SQLite).
+> - Queues run on Redis using `REDIS_URL`.
+> - Local infra is started with `docker compose -f infra/docker-compose.dev.yml up -d`.
+> - Services are started with `npm run start:service` and `npm run start:worker`.
+> - Cloud deployment uses the root `render.yaml` (service + worker + Redis + Postgres).
+
 ## GLOBAL RULES (read first)
 
 - **Do not change the design or order**. Follow the previously approved 12 sections and the 5 PRs verbatim.
@@ -29,12 +36,12 @@
 - `DEFAULT_BRANCH` = `main`
 - `NODE_VERSION` = `>=20`
 - `REDIS_URL` = `redis://localhost:6379` (local) / `redis://redis:6379` (docker)
-- `SQLITE_URL` = file `devinswarm.db`
+- `DATABASE_URL` = Postgres connection string (local and Render)
 - **Secrets that will be requested when needed** (Codex must escalate for these):
     - `OPENAI_API_KEY`
     - `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY` (PEM), `GITHUB_WEBHOOK_SECRET`
     - (Later) ChatKit config for the embedded escalation page
-    - (Later in PR #5) `POSTGRES_URL` and helm/deploy context
+    - (Managed) Postgres database details for `DATABASE_URL` in cloud environments
 
 ---
 
@@ -56,7 +63,7 @@
 **Codex do:**
 - Commit a `docs/design.md` that restates the approved hierarchy:
     - Manager/Orchestrator (LangGraph JS) → delegates to workers (dev, reviewer, research, ops, **improvement‑scout**).
-    - Tools (git, GitHub, CI, RAG optional), Runtime (Redis queue, SQLite dev store), UI (ChatKit embed + GitHub PR/Issues).
+    - Tools (git, GitHub, CI, RAG optional), Runtime (Redis queue + Postgres store via Prisma), UI (ChatKit embed + GitHub PR/Issues).
 - Include sequence diagram and states (`intake → plan → assign → monitor → report`).
 
 **Acceptance:** `docs/design.md` merged in PR #1 (or included as part of PR #1).
@@ -90,11 +97,11 @@
 - `package.json` add runtime deps (exact versions may be latest compatible):
     - `"express"`, `"@octokit/rest"`, `"bullmq"`, `"ioredis"`, `"zod"`, `"dotenv"`, `"uuid"`, `"winston"`,
     - LangGraph JS (install the canonical **JS package for LangGraph**),
-    - SQLite driver (e.g., `"better-sqlite3"` or `"sqlite3"`).
+    - Prisma + Postgres client (using `DATABASE_URL`).
 - Dev deps: `"typescript"`, `"ts-node"`, `"nodemon"`, `"@types/node"`, `"@types/express"`, `"eslint"` (if desired).
 - Remove any custom in‑memory loops / “agent chat” files and record them in PR notes as deprecated (do **not** delete user content that carries value; move it to `/docs/archive/` if needed).
 
-**Escalate if blocked:** If `better-sqlite3`/`sqlite3` build fails on Windows, request the user to run the Node build tools installer and confirm Python/VS Build Tools are present, then re‑install.
+**Escalate if blocked:** If Postgres/Prisma migrations or client initialization fail, request the user to confirm `DATABASE_URL` and local/managed Postgres availability, then rerun `npm run db:generate && npm run db:push`.
 
 **Acceptance:** `npm run build` succeeds.
 
@@ -106,7 +113,7 @@
 **Codex do:**
 - In `/orchestrator/graph/manager.graph.ts`, create a **minimal graph** with nodes: `intake`, `plan`, `assign`, `report`. Each node just logs and advances.
 - In `/runtime/queue/redis.ts`, add BullMQ queue producer/consumer scaffolding.
-- In `/runtime/store/sqlite.ts`, initialize a DB with tables `runs`, `steps`, `blocks`.
+- In `prisma/schema.prisma` and the Postgres database behind `DATABASE_URL`, define tables for runs, steps, and blocks.
 - In `/tools/github.ts`, add an Octokit placeholder (no auth yet).
 - In `/prompts/manager.md` and `workers/*.md`, commit the initial role/system prompts (stubs are fine in PR #1).
 
@@ -144,14 +151,14 @@
 **Goal:** Make it runnable locally with Redis + SQLite and **one** dev worker.
 
 **Codex do:**
-1. Add `docker-compose.dev.yml` with Redis service.
+1. Add `infra/docker-compose.dev.yml` with Redis + Postgres services.
 2. Update `.env.example` → `REDIS_URL`, `SQLITE_PATH`, `OPENAI_API_KEY` (left empty).
 3. Implement `npm scripts`:
-    - `start:service`, `start:dev-worker`.
+    - `start:service`, `start:worker`.
 4. Provide a **README local section** with:
-    - `docker compose -f docker-compose.dev.yml up -d redis`
-    - `cp .env.example .env && npm i && npm run build && npm run start:service`
-    - In a 2nd terminal: `npm run start:dev-worker`
+    - `docker compose -f infra/docker-compose.dev.yml up -d`
+    - `cp .env.example .env && npm ci && npm run db:generate && npm run db:push && npm run start:service`
+    - In a 2nd terminal: `npm run start:worker`
 5. Open a tracking issue “Local bring‑up complete” with logs and instructions.
 
 **Escalate if blocked:** If Redis isn’t reachable, ask the user to start docker and re‑run compose.
@@ -269,7 +276,7 @@
 - Migrations/seeds and readiness/liveness probes.
 
 **Escalate for (secrets/accounts):**
-- Request `POSTGRES_URL` (managed DB or self‑hosted), and any K8s context if Helm is used.
+- Request `DATABASE_URL` / managed Postgres details (or connection string), and any K8s context if Helm is used.
 
 **Acceptance:**
 - `helm template` (or docker compose) validates; the service comes up against Postgres; the queue processes jobs.
@@ -305,7 +312,7 @@
     "dev": "nodemon service/index.ts",
     "build": "tsc -p tsconfig.json",
     "start:service": "node dist/service/index.js",
-    "start:dev-worker": "node dist/workers/dev/worker.js",
+    "start:worker": "node dist/workers/dev/worker.js",
     "lint": "eslint ."
   }
 }

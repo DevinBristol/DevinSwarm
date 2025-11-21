@@ -4,7 +4,7 @@ DevinSwarm is an orchestrator‑first, queue‑driven agent swarm built on Node 
 
 - **Manager / Orchestrator** (LangGraph JS) coordinates multi‑step runs.
 - **Workers** (`dev`, `reviewer`, `research`, `ops`, `scout`) execute concrete tasks.
-- **Runtime** uses Redis + BullMQ for queues and SQLite (dev) / Postgres (prod) for durable state.
+- **Runtime** uses Redis + BullMQ for queues and Postgres (via Prisma) for durable state.
 - **Tools** provide low‑level integrations (git/GitHub/CI/RAG/filesystem).
 - **Service** exposes HTTP endpoints and webhook adapters (e.g., GitHub, ChatKit).
 
@@ -58,7 +58,7 @@ with a single `dev` worker connected to the queue.
 
 - **24/7** – A Redis‑backed queue (`runtime/queue`) plus independently deployable workers (`workers/*`) allow continuous processing.
 - **Scaling** – Horizontal scaling is achieved by running multiple worker replicas against the same Redis queue.
-- **Durability** – Runs are persisted in SQLite locally (`runtime/store/sqliteStore.ts`) and later migrated to Postgres with Helm for production (PR #5).
+- **Durability** - Runs are persisted in Postgres via Prisma (`DATABASE_URL`) both locally and in production.
 
 ## Human‑in‑the‑Loop (HITL)
 
