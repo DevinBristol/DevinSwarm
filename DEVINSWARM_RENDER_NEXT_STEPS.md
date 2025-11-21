@@ -76,6 +76,7 @@ Render is already configured via the root `render.yaml` as a Blueprint:
 - Ops worker: `devinswarm-ops` (runs `npm run start:ops-worker`).
 - Keyvalue: `devinswarm-kv` (provides `REDIS_URL`).
 - Postgres: `devinswarm-postgres` (provides `DATABASE_URL`).
+- Auto-deploy: enabled for the Render services/workers; pushes to `main` trigger deployments.
 
 For **all services/workers** (`devinswarm-service`, `devinswarm-worker`, `devinswarm-reviewer`, `devinswarm-ops`):
 
