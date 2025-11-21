@@ -88,6 +88,8 @@ const graphBuilder = new StateGraph(OrchestratorState)
   .addEdge("intake", "plan")
   .addEdge("plan", "assign")
   .addEdge("assign", "report")
+  .addEdge("assign", "escalate")
+  .addEdge("escalate", "report")
   .addEdge("report", END);
 
 export const orchestratorGraph = graphBuilder.compile({
