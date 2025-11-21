@@ -4,6 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { devQueue } from "../../../packages/shared/queue";
 import { registerWebhook } from "./webhooks";
 import { randomUUID } from "crypto";
+import { runOrchestratorForRun } from "../../../orchestrator";
 
 const prisma = new PrismaClient();
 const app = Fastify({ logger: true });
@@ -36,6 +37,21 @@ app.post("/intake", async (req, rep) => {
       phase: "intake",
       budgetUsd: Number(budgetUsd ?? 5),
     },
+  });
+
+  // Kick off orchestrator logging for intake -> plan -> assign -> report.
+  // This does not block the queue handoff.
+  runOrchestratorForRun(
+    { prisma },
+    {
+      id: run.id,
+      description: run.description ?? "",
+      planSummary: run.title ?? null,
+      source: "http",
+    },
+  ).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.warn(`[orchestrator] failed to log graph for run ${run.id}:`, err);
   });
 
   await devQueue.add("dev.start", { runId: run.id });
