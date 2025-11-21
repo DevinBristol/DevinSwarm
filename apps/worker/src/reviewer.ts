@@ -2,6 +2,7 @@ import { makeWorker, opsQueue } from "../../../packages/shared/queue";
 import { PrismaClient } from "@prisma/client";
 import { ALLOWED_REPOS } from "../../../packages/shared/policy";
 import { evaluateHitl } from "../../../orchestrator/policies/hitl";
+import { runTests } from "../../../tools/tests";
 
 const prisma = new PrismaClient();
 
@@ -70,6 +71,15 @@ makeWorker(
           },
         }),
       ]);
+
+      const tests = await runTests("npm test -- --watch=false", { cwd: process.cwd() });
+      await prisma.event.create({
+        data: {
+          runId,
+          type: "review:tests",
+          payload: { success: tests.success, output: tests.output },
+        },
+      });
 
       // Stub review worker: log and hand off to ops. Extend with tests/linters and PR comments later.
       // eslint-disable-next-line no-console

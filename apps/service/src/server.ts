@@ -77,10 +77,15 @@ app.post("/runs/:id/unblock", async (req, rep) => {
   const token = (req.headers["x-ui-token"] ?? "") as string;
   if (token !== process.env.UI_TOKEN) return rep.code(401).send({ error: "unauthorized" });
   const id = (req.params as any).id;
-  await prisma.run.update({
-    where: { id },
-    data: { state: "running", blockedReason: null },
-  });
+  await prisma.$transaction([
+    prisma.run.update({
+      where: { id },
+      data: { state: "running", blockedReason: null },
+    }),
+    prisma.event.create({
+      data: { runId: id, type: "hitl:unblocked", payload: {} },
+    }),
+  ]);
   return { ok: true };
 });
 
@@ -136,6 +141,23 @@ app.get("/ui", async (_req, rep) => {
     )
     .join("");
 
+  const events = await prisma.event.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 30,
+  });
+
+  const eventRows = events
+    .map(
+      (e) => `
+      <tr>
+        <td>${e.createdAt.toISOString()}</td>
+        <td>${e.runId}</td>
+        <td>${e.type}</td>
+        <td><pre style="white-space:pre-wrap; max-width:400px;">${JSON.stringify(e.payload)}</pre></td>
+      </tr>`,
+    )
+    .join("");
+
   const html = `<!doctype html><meta name=viewport content="width=device-width, initial-scale=1">
   <h2>DevinSwarm Runs</h2>
   <div style="margin-bottom:12px;">
@@ -152,6 +174,11 @@ app.get("/ui", async (_req, rep) => {
   <table border=1 cellpadding=6>
     <tr><th>Time</th><th>State</th><th>Phase</th><th>Review</th><th>Ops</th><th>Repo</th><th>Branch</th><th>PR</th><th>Description</th><th>Escalation</th><th>Blocked</th><th>Action</th></tr>
     ${rows}
+  </table>
+  <h3 style="margin-top:16px;">Recent Events</h3>
+  <table border=1 cellpadding=6>
+    <tr><th>Time</th><th>Run</th><th>Type</th><th>Payload</th></tr>
+    ${eventRows}
   </table>
   <script>
     async function unblock(id) {

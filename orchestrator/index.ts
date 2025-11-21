@@ -22,15 +22,26 @@ export async function runOrchestratorForRun(
     source: input.source ?? "queue",
   });
 
-  await ctx.prisma.event.create({
-    data: {
-      runId: input.id,
-      type: "orchestrator:completed",
-      payload: {
-        status: graphState.status,
-        planSummary: graphState.planSummary,
-        logs: graphState.logs,
+  await ctx.prisma.$transaction([
+    ctx.prisma.event.create({
+      data: {
+        runId: input.id,
+        type: "orchestrator:completed",
+        payload: {
+          status: graphState.status,
+          planSummary: graphState.planSummary,
+          logs: graphState.logs,
+        },
       },
-    },
-  });
+    }),
+    ...graphState.logs.map((log) =>
+      ctx.prisma.event.create({
+        data: {
+          runId: input.id,
+          type: "orchestrator:log",
+          payload: { message: log },
+        },
+      }),
+    ),
+  ]);
 }

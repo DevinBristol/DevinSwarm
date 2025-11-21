@@ -2,6 +2,7 @@ import { makeWorker } from "../../../packages/shared/queue";
 import { PrismaClient } from "@prisma/client";
 import { ALLOWED_REPOS } from "../../../packages/shared/policy";
 import { evaluateHitl } from "../../../orchestrator/policies/hitl";
+import { runTests } from "../../../tools/tests";
 
 const prisma = new PrismaClient();
 
@@ -70,6 +71,15 @@ makeWorker(
           },
         }),
       ]);
+
+      const statusCheck = await runTests("npm run build", { cwd: process.cwd() });
+      await prisma.event.create({
+        data: {
+          runId,
+          type: "ops:status",
+          payload: { success: statusCheck.success, output: statusCheck.output },
+        },
+      });
 
       // Stub ops worker: log and mark run complete. Extend with CI/status gating and merge logic later.
       // eslint-disable-next-line no-console
