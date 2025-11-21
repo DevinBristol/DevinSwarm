@@ -107,6 +107,13 @@ To move seamlessly between machines:
   - `npm run db:push`
 - Then use the local dev commands above or the Render smoke tests from `DEVINSWARM_RENDER_NEXT_STEPS.md`.
 
+## Render Smoke Checklist
+
+1) Health: `curl https://<service-url>/health` (expect `{ ok: true }`).
+2) Env snapshot: `curl https://<service-url>/debug/env -H "x-ui-token: <UI_TOKEN>"` (verify `REDIS_URL`, `DATABASE_URL`, GitHub fields, and `UI_TOKEN_PRESENT` are true).
+3) Intake: `curl -X POST https://<service-url>/intake -H "Content-Type: application/json" -d '{"repo":"DevinBristol/DevinSwarm","description":"Render smoke test"}'`.
+4) UI: open `https://<service-url>/ui` and confirm the new run moves through dev -> review -> ops and shows branch/PR when done.
+
 ## DevinSwarm Bootstrap
 
 This repo contains a multi-agent swarm with:
