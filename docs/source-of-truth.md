@@ -17,11 +17,11 @@ This is the only living plan/status doc. Keep it on `main`, update it every sess
 - Acceptance: run state persisted between nodes, retry policy enforced, events emitted per transition, resumable after restarts.
 
 ## Active Plan
-- [ ] Persist run state per node (status/phase/currentNode/retries/tasks/planSummary/statusHistory) and support resume from DB.
-- [ ] Emit structured events per transition (start/complete/fail/blocked) with reasons/retries/timestamps.
-- [ ] Drive transitions via compiled graph with retry limits; integrate worker results/HITL for success/fail/escalate edges.
-- [ ] Set timestamps (`startedAt`/`completedAt`) and `lastError`; finalize Prisma migration for new columns.
-- [ ] Deduplicate orchestrator entry (single caller) and let workers publish their own events.
+- [x] Persist run state per node (status/phase/currentNode/retries/tasks/planSummary/statusHistory) and support resume from DB.
+- [x] Emit structured events per transition (start/complete/fail/blocked) with reasons/retries/timestamps.
+- [x] Drive transitions via retry-limited graph nodes with resume support; blocked/fail transitions halt until HITL/unblock.
+- [x] Set timestamps (`startedAt`/`completedAt`) and `lastError`; add a Prisma migration for new columns.
+- [x] Deduplicate orchestrator entry (single caller); workers emit their own events without double orchestration.
 
 ## Decisions
 - 2025-11-21: Allowlist starts with `DevinBristol/DevinSwarm`; ensure installation ID matches.
@@ -38,6 +38,7 @@ This is the only living plan/status doc. Keep it on `main`, update it every sess
 - Any node-specific retry caps to tighten/loosen beyond the initial defaults?
 
 ## Session Log (newest first)
+- 2025-11-21: Phase 1 persistence/events/resume added (per-step DB updates, statusHistory, timestamps, migration), worker no longer double-calls orchestrator; SOT/guardrails in place.
 - 2025-11-21: Created single SOT on `main`, archived prior plan docs, added bootstrap/guardrail instructions.
 
 ## Backlog / Later Phases

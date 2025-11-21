@@ -3,7 +3,6 @@ import { PrismaClient } from "@prisma/client";
 import { ghInstallClient } from "../../../packages/shared/github";
 import { ALLOWED_REPOS, AUTO_MERGE_LOW_RISK } from "../../../packages/shared/policy";
 import { evaluateHitl } from "../../../orchestrator/policies/hitl";
-import { runOrchestratorForRun } from "../../../orchestrator";
 import { createWorkspace, cleanupWorkspace, WorkspacePaths } from "../../../tools/fs";
 
 const prisma = new PrismaClient();
@@ -65,21 +64,6 @@ makeWorker(
       }),
     ]);
       throw new Error(`Repo not allowed: ${run.repo}`);
-    }
-
-    try {
-      await runOrchestratorForRun(
-        { prisma },
-        {
-          id: runId,
-          description: run.description ?? "",
-          planSummary: run.title ?? null,
-        },
-      );
-    } catch (err) {
-      // orchestration logs shouldn't block dev worker
-      // eslint-disable-next-line no-console
-      console.warn(`[dev] orchestration logging failed for run ${runId}:`, err);
     }
 
     // Evaluate HITL before starting if required secrets are missing.

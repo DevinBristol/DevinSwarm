@@ -45,8 +45,12 @@ app.post("/intake", async (req, rep) => {
     { prisma },
     {
       id: run.id,
+      repo: run.repo,
+      branch: run.branch ?? "main",
       description: run.description ?? "",
+      title: run.title ?? undefined,
       planSummary: run.title ?? null,
+      tasks: [],
       source: "http",
     },
   ).catch((err) => {
