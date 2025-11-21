@@ -29,8 +29,8 @@ DevinSwarm is an orchestrator‑first, queue‑driven agent swarm built on Node 
 
 - **/runtime** – Queue + store + events:
   - `/runtime/queue` – BullMQ queues and workers over Redis.
-  - `/runtime/store` – SQLite dev store and, later, Postgres adapters.
-  - `/runtime/events` – event fan‑out to HITL channels and GitHub.
+  - `/runtime/store` – Postgres adapters via Prisma (legacy SQLite has been removed).
+  - `/runtime/events` – event fan-out to HITL channels and GitHub.
 
 - **/tools** – Integrations:
   - `git`, `github`, `ci`, `fs`, `rag` for repo access and automation.

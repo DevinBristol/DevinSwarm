@@ -12,53 +12,30 @@ This repo follows the `CODEx_RUNBOOK.md` plan, evolving toward:
 
 ## Local Development
 
-Prerequisites:
-
-- Node.js >= 20
-- npm
-- Docker (for Redis in dev)
-
-Install dependencies:
+Prerequisites: Node.js >= 20, npm >= 10, Docker Desktop with Compose.
 
 ```bash
-npm install
-```
-
-Create an env file:
-
-```bash
+# install deps and copy the env template
+npm ci
 cp .env.example .env
-```
 
-Fill in at least:
-
-- `OPENAI_API_KEY` – your OpenAI key (do not commit it).
-- `REDIS_URL=redis://localhost:6379`
-- `DATABASE_URL=postgresql://swarm:swarm@localhost:5432/swarm?schema=public`
-
-Start Redis locally:
-
-```bash
+# start Postgres + Redis (Docker)
 docker compose -f infra/docker-compose.dev.yml up -d
-```
 
-Build the project:
+# generate Prisma client + ensure schema applied
+npm run db:generate
+npm run db:push
 
-```bash
-npm run build
-```
-
-Run the HTTP service:
-
-```bash
-npm run start:service
-```
-
-Run the dev worker in another terminal:
-
-```bash
+# run the service and worker (separate terminals)
+npm run start:service   # http://localhost:3000/ui
 npm run start:worker
 ```
+
+Fill in `.env` with at least:
+
+- `OPENAI_API_KEY` — your OpenAI key (do not commit it).
+- `DATABASE_URL=postgresql://devinswarm:devinswarm@localhost:5432/devinswarm?schema=public`
+- `REDIS_URL=redis://localhost:6379`
 
 Trigger a dummy run:
 
@@ -93,6 +70,7 @@ High‑level steps:
    - `REDIS_URL` (from a Render Redis/Key-Value instance)
    - `DATABASE_URL` (from a Render Postgres database)
    - `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`
+   - `DAILY_BUDGET_USD`, `AUTO_MERGE_LOW_RISK`, `ALLOWED_REPOS`
    - `UI_TOKEN`
 
 With those in place, the Render web + worker services give you a 24/7 cloud-hosted DevinSwarm that can process jobs from the Redis queue.

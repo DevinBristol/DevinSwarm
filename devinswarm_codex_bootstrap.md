@@ -127,7 +127,7 @@ GITHUB_WEBHOOK_SECRET=
 
 # Datastores (local dev via Docker; Render injects its own)
 REDIS_URL=redis://localhost:6379
-DATABASE_URL=postgresql://swarm:swarm@localhost:5432/swarm?schema=public
+DATABASE_URL=postgresql://devinswarm:devinswarm@localhost:5432/devinswarm?schema=public
 
 # Policy
 AUTO_MERGE_LOW_RISK=true

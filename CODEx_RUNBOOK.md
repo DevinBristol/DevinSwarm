@@ -147,12 +147,12 @@
 
 ---
 
-# (7) Step‑by‑step: get it running fast (local dev)
-**Goal:** Make it runnable locally with Redis + SQLite and **one** dev worker.
+# (7) Step-by-step: get it running fast (local dev)
+**Goal:** Make it runnable locally with Redis + Postgres and **one** dev worker.
 
 **Codex do:**
 1. Add `infra/docker-compose.dev.yml` with Redis + Postgres services.
-2. Update `.env.example` → `REDIS_URL`, `SQLITE_PATH`, `OPENAI_API_KEY` (left empty).
+2. Update `.env.example` → `REDIS_URL`, `DATABASE_URL`, `OPENAI_API_KEY` (left empty placeholders).
 3. Implement `npm scripts`:
     - `start:service`, `start:worker`.
 4. Provide a **README local section** with:
@@ -210,11 +210,11 @@
 
 > **You MUST create five separate PRs with these exact contents.** Each PR includes a checklist and “How to unblock” section. If anything requires secrets or accounts, use the Escalation Template.
 
-### PR #1 – Orchestrator skeleton (SQLite dev, Redis queue, one dev worker)
+### PR #1 – Orchestrator skeleton (Postgres store, Redis queue, one dev worker)
 **Include:**
 - Add `/orchestrator`, `/runtime`, `/tools`, `/prompts`.
 - Minimal graph: `intake → plan → assign → report`.
-- SQLite store (dev), Redis queue, **one dev worker**.
+- Postgres store via Prisma, Redis queue, **one dev worker**.
 - Local run instructions and `.env.example`.
 
 **Escalate for:** None expected, except Redis docker up on user’s machine.
@@ -271,7 +271,7 @@
 
 ### PR #5 – Postgres + Helm (prod)
 **Include:**
-- Switch store from SQLite → **Postgres** (keep SQLite for dev).
+- Finalize Postgres as the only store (ensure `DATABASE_URL` is used everywhere, no SQLite fallbacks).
 - Add **Helm chart** (or Docker Compose for prod) and envs for DB, Redis, service + workers.
 - Migrations/seeds and readiness/liveness probes.
 

@@ -21,7 +21,7 @@ This file captures how to run DevinSwarm locally and on Render now that the serv
   - `GITHUB_WEBHOOK_SECRET=placeholder_123456789`
 - `.env` (local only, not committed) also includes:
   - `OPENAI_API_KEY=<your OpenAI key>`
-  - `DATABASE_URL=postgres://swarm:swarm@localhost:5432/swarm`
+  - `DATABASE_URL=postgresql://devinswarm:devinswarm@localhost:5432/devinswarm?schema=public`
   - `REDIS_URL=redis://localhost:6379`
   - `AUTO_MERGE_LOW_RISK=true`
   - `ALLOWED_REPOS=DevinBristol/DevinSwarm`

@@ -63,12 +63,16 @@ services:
         sync: false
       - key: GITHUB_PRIVATE_KEY
         sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
       - key: DAILY_BUDGET_USD
         value: "75"
       - key: AUTO_MERGE_LOW_RISK
         value: "true"
       - key: ALLOWED_REPOS
         value: "DevinBristol/DevinSwarm"
+      - key: UI_TOKEN
+        sync: false
 
   - type: keyvalue
     name: devinswarm-kv
