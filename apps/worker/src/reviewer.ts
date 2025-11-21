@@ -57,33 +57,6 @@ makeWorker(
         throw new Error(`Repo not allowed for review: ${run.repo}`);
       }
 
-      // Evaluate HITL before starting review.
-      const hitlPrecheck = evaluateHitl({
-        missingSecret:
-          !process.env.GITHUB_APP_ID || !process.env.GITHUB_PRIVATE_KEY || !process.env.GITHUB_INSTALLATION_ID,
-      });
-      if (hitlPrecheck.escalate) {
-        await prisma.$transaction([
-          prisma.run.update({
-            where: { id: runId },
-            data: {
-              state: "awaiting_unblock",
-              blockedReason: `HITL: ${hitlPrecheck.reason}`,
-              phase: "review",
-              reviewStatus: "blocked",
-            },
-          }),
-          prisma.event.create({
-            data: {
-              runId,
-              type: "hitl:escalated",
-              payload: { reason: hitlPrecheck.reason, requestedInput: hitlPrecheck.requestedInput },
-            },
-          }),
-        ]);
-        return;
-      }
-
       await prisma.$transaction([
         prisma.run.update({
           where: { id: runId },
