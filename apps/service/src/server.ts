@@ -33,6 +33,7 @@ app.post("/intake", async (req, rep) => {
       description,
       title,
       state: "queued",
+      phase: "intake",
       budgetUsd: Number(budgetUsd ?? 5),
     },
   });
@@ -101,7 +102,12 @@ app.get("/ui", async (_req, rep) => {
   <tr>
     <td>${r.createdAt.toISOString()}</td>
     <td>${r.state}</td>
+    <td>${r.phase ?? ""}</td>
+    <td>${r.reviewStatus ?? ""}</td>
+    <td>${r.opsStatus ?? ""}</td>
     <td>${r.repo}</td>
+    <td>${r.branch ?? ""}</td>
+    <td>${r.prNumber ?? ""}</td>
     <td>${r.description ?? ""}</td>
     <td>${r.blockedReason ?? ""}</td>
     <td>${
@@ -113,8 +119,19 @@ app.get("/ui", async (_req, rep) => {
 
   const html = `<!doctype html><meta name=viewport content="width=device-width, initial-scale=1">
   <h2>DevinSwarm Runs</h2>
+  <div style="margin-bottom:12px;">
+    <h4>New Intake</h4>
+    <form id="intakeForm" onsubmit="return submitIntake(event)">
+      <label>Repo <input name="repo" placeholder="DevinBristol/DevinSwarm" required /></label>
+      <label>Title <input name="title" /></label>
+      <label>Description <input name="description" /></label>
+      <label>Budget USD <input name="budgetUsd" type="number" step="1" value="5" /></label>
+      <button type="submit">Submit</button>
+    </form>
+    <div id="intakeStatus"></div>
+  </div>
   <table border=1 cellpadding=6>
-    <tr><th>Time</th><th>State</th><th>Repo</th><th>Description</th><th>Blocked</th><th>Action</th></tr>
+    <tr><th>Time</th><th>State</th><th>Phase</th><th>Review</th><th>Ops</th><th>Repo</th><th>Branch</th><th>PR</th><th>Description</th><th>Blocked</th><th>Action</th></tr>
     ${rows}
   </table>
   <script>
@@ -124,6 +141,24 @@ app.get("/ui", async (_req, rep) => {
         headers: { 'x-ui-token': '${process.env.UI_TOKEN ?? "change-me"}' }
       });
       if (resp.ok) location.reload(); else alert('Failed');
+    }
+    async function submitIntake(evt) {
+      evt.preventDefault();
+      const form = document.getElementById('intakeForm');
+      const data = Object.fromEntries(new FormData(form));
+      const resp = await fetch('/intake', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const statusEl = document.getElementById('intakeStatus');
+      if (resp.ok) {
+        statusEl.textContent = 'Submitted';
+        form.reset();
+        setTimeout(() => location.reload(), 300);
+      } else {
+        statusEl.textContent = 'Failed: ' + resp.status;
+      }
     }
   </script>`;
 

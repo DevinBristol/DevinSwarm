@@ -7,6 +7,8 @@
     "build": "tsc --noEmit",
     "start:service": "tsx apps/service/src/server.ts",
     "start:worker": "tsx apps/worker/src/worker.ts",
+    "start:reviewer-worker": "tsx apps/worker/src/reviewer.ts",
+    "start:ops-worker": "tsx apps/worker/src/ops.ts",
     "start:scout": "tsx apps/scout/src/scout.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

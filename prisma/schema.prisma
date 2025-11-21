@@ -13,6 +13,11 @@ model Run {
   title         String?
   description   String?
   state         RunState @default(queued)
+  phase         String   @default("intake")
+  branch        String?
+  prNumber      Int?
+  reviewStatus  String   @default("pending")
+  opsStatus     String   @default("pending")
   priority      Int      @default(0)
   budgetUsd     Float    @default(5)
   createdAt     DateTime @default(now())

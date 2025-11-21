@@ -19,6 +19,10 @@ export const reviewQueue = new Queue("review", {
   connection,
   defaultJobOptions: defaultJobOpts,
 });
+export const opsQueue = new Queue("ops", {
+  connection,
+  defaultJobOptions: defaultJobOpts,
+});
 export const scoutQueue = new Queue("scout", {
   connection,
   defaultJobOptions: defaultJobOpts,

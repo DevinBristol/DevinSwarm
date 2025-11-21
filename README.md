@@ -1,6 +1,6 @@
 # DevinSwarm
 
-DevinSwarm is a Node 20+ TypeScript orchestrator built around LangGraph JS. It uses a Redis‑backed queue and dedicated workers to run 24/7 and handle multiple issues in parallel.
+DevinSwarm is a Node 20+ TypeScript orchestrator built around LangGraph JS. It uses a Redis-backed queue and dedicated workers to run 24/7 and handle multiple issues in parallel, targeting an intake -> plan -> dev-execute -> review -> ops -> report/escalate flow.
 
 This repo follows the `CODEx_RUNBOOK.md` plan, evolving toward:
 
@@ -12,7 +12,7 @@ This repo follows the `CODEx_RUNBOOK.md` plan, evolving toward:
 
 ## Local Development
 
-Prerequisites: Node.js >= 20, npm >= 10, Docker Desktop with Compose.
+Prerequisites: Node.js >= 20, npm >= 10, Docker Desktop with Compose.
 
 ```bash
 # install deps and copy the env template
@@ -26,9 +26,12 @@ docker compose -f infra/docker-compose.dev.yml up -d
 npm run db:generate
 npm run db:push
 
-# run the service and worker (separate terminals)
+# run the service and dev worker (separate terminals)
 npm run start:service   # http://localhost:3000/ui
 npm run start:worker
+# optional: reviewer and ops workers
+npm run start:reviewer-worker
+npm run start:ops-worker
 ```
 
 Fill in `.env` with at least:
@@ -36,6 +39,8 @@ Fill in `.env` with at least:
 - `OPENAI_API_KEY` — your OpenAI key (do not commit it).
 - `DATABASE_URL=postgresql://devinswarm:devinswarm@localhost:5432/devinswarm?schema=public`
 - `REDIS_URL=redis://localhost:6379`
+- `ALLOWED_REPOS=DevinBristol/DevinSwarm` (comma-separated to add more)
+- Artifact defaults: `ARTIFACT_BLOB_THRESHOLD_BYTES=5000000`, `ARTIFACT_RETENTION_DAYS=7`
 
 Trigger a dummy run:
 
@@ -45,20 +50,24 @@ curl -X POST http://localhost:3000/intake \
   -d "{\"description\":\"Test DevinSwarm run\"}"
 ```
 
-You should receive a JSON response containing a `id` field. You can then query:
+You should receive a JSON response containing an `id` field. You can then query:
 
 ```bash
 curl http://localhost:3000/runs/<id>
 ```
+
+`/ui` lists recent runs with state, phase, review/ops status, branch, and PR plus a simple intake form to enqueue new runs inline.
 
 ## Cloud Deployment (Render)
 
 This repo includes a root `render.yaml` that defines:
 
 - A **web service** (`devinswarm-service`) running `npm run start:service`.
-- A **worker service** (`devinswarm-worker`) running `npm run start:worker`.
+- A **dev worker** (`devinswarm-worker`) running `npm run start:worker`.
+- A **reviewer worker** (`devinswarm-reviewer`) running `npm run start:reviewer-worker`.
+- An **ops worker** (`devinswarm-ops`) running `npm run start:ops-worker`.
 
-High‑level steps:
+High-level steps:
 
 1. Push this repo to GitHub (e.g., `DevinBristol/DevinSwarm`).
 2. In Render, create a new Web Service from this repo:
@@ -70,7 +79,8 @@ High‑level steps:
    - `REDIS_URL` (from a Render Redis/Key-Value instance)
    - `DATABASE_URL` (from a Render Postgres database)
    - `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`
-   - `DAILY_BUDGET_USD`, `AUTO_MERGE_LOW_RISK`, `ALLOWED_REPOS`
+   - `DAILY_BUDGET_USD`, `AUTO_MERGE_LOW_RISK`, `ALLOWED_REPOS` (comma-separated)
+   - `ARTIFACT_BLOB_THRESHOLD_BYTES`, `ARTIFACT_RETENTION_DAYS`
    - `UI_TOKEN`
 
 With those in place, the Render web + worker services give you a 24/7 cloud-hosted DevinSwarm that can process jobs from the Redis queue.
@@ -88,7 +98,7 @@ Later steps in the runbook will extend this to run tests, linters, and security 
 
 To move seamlessly between machines:
 
-- Make sure each PC has Node 20.19.0, npm ≥ 10, and Docker Desktop with Compose.
+- Make sure each PC has Node 20.19.0, npm >= 10, and Docker Desktop with Compose.
 - On each PC, copy `.env.example` to `.env` and fill in secrets locally (do not commit `.env`).
 - After switching machines, run:
   - `git pull origin main`
@@ -130,4 +140,3 @@ Use the root `render.yaml` as a Blueprint in Render. Set the following environme
 - `GITHUB_PRIVATE_KEY`
 - `GITHUB_WEBHOOK_SECRET`
 - `UI_TOKEN`
-

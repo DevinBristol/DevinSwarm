@@ -10,6 +10,9 @@
 > - Local infra is started with `docker compose -f infra/docker-compose.dev.yml up -d`.
 > - Services are started with `npm run start:service` and `npm run start:worker`.
 > - Cloud deployment uses the root `render.yaml` (service + worker + Redis + Postgres).
+> - Target node flow: intake -> plan -> dev-execute -> review -> ops -> report, with escalate/HITL; PR #1 may temporarily use intake -> plan -> assign -> report.
+> - Artifact defaults: `ARTIFACT_BLOB_THRESHOLD_BYTES=5000000`, `ARTIFACT_RETENTION_DAYS=7` (tunable).
+> - `/ui` lists state/phase/review/ops/branch/PR and includes an inline intake form.
 
 ## GLOBAL RULES (read first)
 
@@ -37,6 +40,7 @@
 - `NODE_VERSION` = `>=20`
 - `REDIS_URL` = `redis://localhost:6379` (local) / `redis://redis:6379` (docker)
 - `DATABASE_URL` = Postgres connection string (local and Render)
+- Artifact env defaults: `ARTIFACT_BLOB_THRESHOLD_BYTES=5000000`, `ARTIFACT_RETENTION_DAYS=7` (adjustable later)
 - **Secrets that will be requested when needed** (Codex must escalate for these):
     - `OPENAI_API_KEY`
     - `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY` (PEM), `GITHUB_WEBHOOK_SECRET`
@@ -62,9 +66,9 @@
 
 **Codex do:**
 - Commit a `docs/design.md` that restates the approved hierarchy:
-    - Manager/Orchestrator (LangGraph JS) → delegates to workers (dev, reviewer, research, ops, **improvement‑scout**).
+    - Manager/Orchestrator (LangGraph JS) -> delegates to workers (dev, reviewer, research, ops, improvement-scout).
     - Tools (git, GitHub, CI, RAG optional), Runtime (Redis queue + Postgres store via Prisma), UI (ChatKit embed + GitHub PR/Issues).
-- Include sequence diagram and states (`intake → plan → assign → monitor → report`).
+- Include sequence diagram and states (`intake -> plan -> dev-execute -> review -> ops -> report`, with `escalate`/HITL).
 
 **Acceptance:** `docs/design.md` merged in PR #1 (or included as part of PR #1).
 

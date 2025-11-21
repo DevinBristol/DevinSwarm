@@ -7,6 +7,8 @@ This file captures how to run DevinSwarm locally and on Render now that the serv
 - Repo is bootstrapped with:
   - Fastify web service at `apps/service/src/server.ts` (`/health`, `/intake`, `/runs`, `/ui`, `/webhooks/github`).
   - Dev worker at `apps/worker/src/worker.ts` using BullMQ and a GitHub App (App ID `2314650`, installation `95392227`).
+  - Reviewer worker stub at `apps/worker/src/reviewer.ts` (review queue).
+  - Ops worker stub at `apps/worker/src/ops.ts` (ops queue).
   - Scout worker at `apps/scout/src/scout.ts`.
   - Prisma schema at `prisma/schema.prisma` backed by Postgres.
   - Shared helpers at `packages/shared/*` (policy, GitHub App client, queue).
@@ -24,7 +26,9 @@ This file captures how to run DevinSwarm locally and on Render now that the serv
   - `DATABASE_URL=postgresql://devinswarm:devinswarm@localhost:5432/devinswarm?schema=public`
   - `REDIS_URL=redis://localhost:6379`
   - `AUTO_MERGE_LOW_RISK=true`
-  - `ALLOWED_REPOS=DevinBristol/DevinSwarm`
+  - `ALLOWED_REPOS=DevinBristol/DevinSwarm` (comma-separated to add more later)
+  - `ARTIFACT_BLOB_THRESHOLD_BYTES=5000000`
+  - `ARTIFACT_RETENTION_DAYS=7`
   - `UI_TOKEN=placeholder_123456789`
 
 If this file exists, the repo is already migrated to the new stack; use it as the quick start for both local dev and Render.
@@ -43,6 +47,9 @@ npm run db:push
 # 3) Start service and worker (separate terminals)
 npm run start:service   # http://localhost:3000/health and /ui
 npm run start:worker
+# optional: reviewer and ops workers
+npm run start:reviewer-worker
+npm run start:ops-worker
 ```
 
 Test locally:
@@ -57,17 +64,20 @@ Invoke-RestMethod http://localhost:3000/intake `
 ```
 
 Then open `http://localhost:3000/ui` in a browser.
+- `/ui` shows recent runs with state, phase, review/ops status, branch, and PR; it includes an intake form to enqueue new runs inline.
 
 ## Render — Stack and Config (already applied)
 
 Render is already configured via the root `render.yaml` as a Blueprint:
 
 - Web service: `devinswarm-service` (runs `npm run start:service`).
-- Worker: `devinswarm-worker` (runs `npm run start:worker`).
+- Dev worker: `devinswarm-worker` (runs `npm run start:worker`).
+- Reviewer worker: `devinswarm-reviewer` (runs `npm run start:reviewer-worker`).
+- Ops worker: `devinswarm-ops` (runs `npm run start:ops-worker`).
 - Keyvalue: `devinswarm-kv` (provides `REDIS_URL`).
 - Postgres: `devinswarm-postgres` (provides `DATABASE_URL`).
 
-For **both** `devinswarm-service` and `devinswarm-worker`:
+For **all services/workers** (`devinswarm-service`, `devinswarm-worker`, `devinswarm-reviewer`, `devinswarm-ops`):
 
 - `OPENAI_API_KEY` = same as in `.env`.
 - `GITHUB_APP_ID` = `2314650`
@@ -77,7 +87,9 @@ For **both** `devinswarm-service` and `devinswarm-worker`:
 - Optionally override:
   - `DAILY_BUDGET_USD` (e.g. `75`)
   - `AUTO_MERGE_LOW_RISK` (`true`/`false`)
-  - `ALLOWED_REPOS` (e.g. `DevinBristol/DevinSwarm`)
+  - `ALLOWED_REPOS` (e.g. `DevinBristol/DevinSwarm`, comma-separated)
+  - `ARTIFACT_BLOB_THRESHOLD_BYTES` (default `5000000`)
+  - `ARTIFACT_RETENTION_DAYS` (default `7`)
 
 Additionally for **web service** (`devinswarm-service`):
 

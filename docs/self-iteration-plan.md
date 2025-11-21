@@ -9,6 +9,23 @@ This document defines the concrete steps to evolve DevinSwarm from a single "PR 
 - Tooling to operate on a real git workspace (clone, edit, test, push) safely and repeatably.
 - Guardrails (HITL, policies, repo allowlists) to avoid unsafe merges.
 
+## Current Focus
+- Land Phase 1 end-to-end: schema updates, expanded run state, `manager.graph.ts` nodes/transitions, and persisted state/events.
+- Add minimal migrations plus null-safe reads to avoid breaking existing paths while fields backfill.
+- Define retry policy + transition reasons per node so later HITL/policy work can subscribe without rework.
+
+## Decisions / Defaults (current)
+- Allowlist: `ALLOWED_REPOS` starts at `DevinBristol/DevinSwarm` (comma-separated to add more later); ensure `GITHUB_INSTALLATION_ID` matches allowed repos.
+- Artifact storage: stay on Postgres + PR comments now; switch to MinIO/S3 when artifacts routinely exceed ~5 MB or need retention beyond 7 days (tuneable via config when added, e.g., `ARTIFACT_BLOB_THRESHOLD_BYTES`, `ARTIFACT_RETENTION_DAYS`).
+- Retry/time budgets (initial): `plan` 1–2 retries at 1–2 min; `dev-execute` 1–2 retries at 10–20 min; `review` 1 retry at 10–15 min; `ops` 1–2 retries at 10–15 min. Escalate sooner on repeatable failures (e.g., lint).
+- Testing bar: keep unit tests on state transitions and add a mocked end-to-end graph run after Phase 1 stabilizes to exercise intake → plan → dev → review → ops → report paths and retry/escalate edges.
+- Opportunity intake: start with manual enqueue (CLI/HTTP/UI), then GitHub webhooks (PR status/test failures, new issues with labels), and optionally a scheduled sweep for stale/failed PRs.
+
+## Open Decisions / Clarifying Questions
+- [ ] Confirm the default retry/time budgets above; any node-specific caps to tighten or loosen?
+- [ ] Keep `ALLOWED_REPOS` to DevinSwarm only until first self-iteration, or pre-emptively add more?
+- [ ] Confirm intake ordering: manual enqueue now, GitHub webhooks next, scheduled sweep optional—any additions?
+
 ## Architecture Anchors
 - Orchestrator: LangGraph state machine with branching and retries.
 - Queue: Redis/BullMQ with distinct queues for dev, reviewer, ops; status events recorded in Postgres.

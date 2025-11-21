@@ -1,4 +1,4 @@
-import { makeWorker } from "../../../packages/shared/queue";
+import { makeWorker, reviewQueue } from "../../../packages/shared/queue";
 import { PrismaClient } from "@prisma/client";
 import { ghInstallClient } from "../../../packages/shared/github";
 import { ALLOWED_REPOS, AUTO_MERGE_LOW_RISK } from "../../../packages/shared/policy";
@@ -33,17 +33,33 @@ makeWorker(
     if (!run) return;
 
     if (!ALLOWED_REPOS.has(run.repo)) {
-      await prisma.run.update({
+      await prisma.$transaction([
+      prisma.run.update({
         where: { id: runId },
-        data: { state: "failed", blockedReason: "Repo not allowed" },
-      });
+        data: {
+          state: "failed",
+          blockedReason: "Repo not allowed",
+          phase: "dev",
+          reviewStatus: "blocked",
+          opsStatus: "blocked",
+        },
+      }),
+      prisma.event.create({
+        data: { runId, type: "dev:failed", payload: { error: "Repo not allowed" } },
+      }),
+    ]);
       throw new Error(`Repo not allowed: ${run.repo}`);
     }
 
-    await prisma.run.update({
-      where: { id: runId },
-      data: { state: "running" },
-    });
+    await prisma.$transaction([
+      prisma.run.update({
+        where: { id: runId },
+        data: { state: "running", phase: "dev", reviewStatus: "pending", opsStatus: "pending" },
+      }),
+      prisma.event.create({
+        data: { runId, type: "dev:start", payload: {} },
+      }),
+    ]);
 
     try {
       const [owner, repo] = run.repo.split("/");
@@ -119,18 +135,48 @@ makeWorker(
         }
       }
 
-      await prisma.run.update({
-        where: { id: runId },
-        data: { state: "done" },
+      await prisma.event.create({
+        data: {
+          runId,
+          type: "dev:completed",
+          payload: { prNumber: (pr.data as any).number, branch },
+        },
       });
-    } catch (err: any) {
+
       await prisma.run.update({
         where: { id: runId },
         data: {
-          state: "awaiting_unblock",
-          blockedReason: String(err?.message ?? err),
+          branch,
+          prNumber: (pr.data as any).number,
+          phase: "review",
+          reviewStatus: "queued",
         },
       });
+
+      // Hand off to reviewer queue; run stays "running" until ops finishes.
+      await reviewQueue.add("review.start", {
+        runId,
+        repo: run.repo,
+        branch,
+        prNumber: (pr.data as any).number,
+      });
+    } catch (err: any) {
+      await prisma.$transaction([
+        prisma.run.update({
+          where: { id: runId },
+          data: {
+            state: "awaiting_unblock",
+            phase: "dev",
+            reviewStatus: "blocked",
+            opsStatus: "blocked",
+            blockedReason: String(err?.message ?? err),
+          },
+        }),
+        prisma.event.create({
+          data: { runId, type: "dev:failed", payload: { error: String(err?.message ?? err) } },
+        }),
+      ]);
+      throw err;
     }
   },
   2,
