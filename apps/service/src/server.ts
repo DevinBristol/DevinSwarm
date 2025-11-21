@@ -109,6 +109,9 @@ app.get("/ui", async (_req, rep) => {
     <td>${r.branch ?? ""}</td>
     <td>${r.prNumber ?? ""}</td>
     <td>${r.description ?? ""}</td>
+    <td>${
+      r.state === "awaiting_unblock" ? "HITL" : ""
+    }</td>
     <td>${r.blockedReason ?? ""}</td>
     <td>${
       r.state === "awaiting_unblock" ? `<button onclick="unblock('${r.id}')">Unblock</button>` : ""
@@ -131,7 +134,7 @@ app.get("/ui", async (_req, rep) => {
     <div id="intakeStatus"></div>
   </div>
   <table border=1 cellpadding=6>
-    <tr><th>Time</th><th>State</th><th>Phase</th><th>Review</th><th>Ops</th><th>Repo</th><th>Branch</th><th>PR</th><th>Description</th><th>Blocked</th><th>Action</th></tr>
+    <tr><th>Time</th><th>State</th><th>Phase</th><th>Review</th><th>Ops</th><th>Repo</th><th>Branch</th><th>PR</th><th>Description</th><th>Escalation</th><th>Blocked</th><th>Action</th></tr>
     ${rows}
   </table>
   <script>

@@ -67,11 +67,23 @@ const reportNode = async (
   };
 };
 
+const escalateNode = async (
+  state: OrchestratorStateType,
+): Promise<Partial<OrchestratorStateType>> => {
+  return {
+    status: "escalated",
+    logs: [
+      `[escalate] run ${state.runId} requires HITL before continuing`,
+    ],
+  };
+};
+
 const graphBuilder = new StateGraph(OrchestratorState)
   .addNode("intake", intakeNode)
   .addNode("plan", planNode)
   .addNode("assign", assignNode)
   .addNode("report", reportNode)
+  .addNode("escalate", escalateNode)
   .addEdge(START, "intake")
   .addEdge("intake", "plan")
   .addEdge("plan", "assign")

@@ -1,6 +1,7 @@
 import { makeWorker, opsQueue } from "../../../packages/shared/queue";
 import { PrismaClient } from "@prisma/client";
 import { ALLOWED_REPOS } from "../../../packages/shared/policy";
+import { evaluateHitl } from "../../../orchestrator/policies/hitl";
 
 const prisma = new PrismaClient();
 
@@ -35,60 +36,125 @@ makeWorker(
     if (!run) return;
 
     const targetRepo = repo ?? run.repo;
+    const attempt = typeof job.attemptsMade === "number" ? job.attemptsMade + 1 : 1;
 
-    if (!ALLOWED_REPOS.has(targetRepo)) {
+    try {
+      if (!ALLOWED_REPOS.has(targetRepo)) {
+        await prisma.$transaction([
+          prisma.run.update({
+            where: { id: runId },
+            data: {
+              state: "awaiting_unblock",
+              blockedReason: "Repo not allowed (review)",
+              phase: "review",
+              reviewStatus: "blocked",
+            },
+          }),
+          prisma.event.create({
+            data: { runId, type: "review:failed", payload: { error: "Repo not allowed" } },
+          }),
+        ]);
+        throw new Error(`Repo not allowed for review: ${run.repo}`);
+      }
+
+      // Evaluate HITL before starting review.
+      const hitlPrecheck = evaluateHitl({
+        missingSecret:
+          !process.env.GITHUB_APP_ID || !process.env.GITHUB_PRIVATE_KEY || !process.env.GITHUB_INSTALLATION_ID,
+      });
+      if (hitlPrecheck.escalate) {
+        await prisma.$transaction([
+          prisma.run.update({
+            where: { id: runId },
+            data: {
+              state: "awaiting_unblock",
+              blockedReason: `HITL: ${hitlPrecheck.reason}`,
+              phase: "review",
+              reviewStatus: "blocked",
+            },
+          }),
+          prisma.event.create({
+            data: {
+              runId,
+              type: "hitl:escalated",
+              payload: { reason: hitlPrecheck.reason, requestedInput: hitlPrecheck.requestedInput },
+            },
+          }),
+        ]);
+        return;
+      }
+
+      await prisma.$transaction([
+        prisma.run.update({
+          where: { id: runId },
+          data: { phase: "review", reviewStatus: "running" },
+        }),
+        prisma.event.create({
+          data: {
+            runId,
+            type: "review:start",
+            payload: { branch: branch ?? run.branch, prNumber: prNumber ?? run.prNumber },
+          },
+        }),
+      ]);
+
+      // Stub review worker: log and hand off to ops. Extend with tests/linters and PR comments later.
+      // eslint-disable-next-line no-console
+      console.log(`[review] stub processed run ${runId} for ${targetRepo}`);
+
+      await prisma.event.create({
+        data: {
+          runId,
+          type: "review:completed",
+          payload: { branch: branch ?? run.branch, prNumber: prNumber ?? run.prNumber },
+        },
+      });
+      await prisma.run.update({
+        where: { id: runId },
+        data: { phase: "ops", reviewStatus: "done", opsStatus: "queued" },
+      });
+      await opsQueue.add("ops.start", {
+        runId,
+        repo: targetRepo,
+        branch: branch ?? run.branch,
+        prNumber: prNumber ?? run.prNumber,
+      });
+    } catch (err: any) {
+      const hitlDecision = evaluateHitl({
+        failedTestAttempts: attempt,
+        explicitReason: err?.response?.data?.message ? String(err.response.data.message) : undefined,
+      });
+
       await prisma.$transaction([
         prisma.run.update({
           where: { id: runId },
           data: {
             state: "awaiting_unblock",
-            blockedReason: "Repo not allowed (review)",
+            blockedReason: hitlDecision.escalate
+              ? `HITL: ${hitlDecision.reason ?? String(err?.message ?? err)}`
+              : String(err?.message ?? err),
             phase: "review",
             reviewStatus: "blocked",
           },
         }),
         prisma.event.create({
-          data: { runId, type: "review:failed", payload: { error: "Repo not allowed" } },
+          data: { runId, type: "review:failed", payload: { error: String(err?.message ?? err) } },
         }),
+        hitlDecision.escalate
+          ? prisma.event.create({
+              data: {
+                runId,
+                type: "hitl:escalated",
+                payload: { reason: hitlDecision.reason, requestedInput: hitlDecision.requestedInput },
+              },
+            })
+          : prisma.event.create({
+              data: { runId, type: "hitl:pending", payload: { note: "Awaiting unblock after review failure" } },
+            }),
       ]);
-      throw new Error(`Repo not allowed for review: ${run.repo}`);
+
+      throw err;
     }
-
-    await prisma.$transaction([
-      prisma.run.update({
-        where: { id: runId },
-        data: { phase: "review", reviewStatus: "running" },
-      }),
-      prisma.event.create({
-        data: {
-          runId,
-          type: "review:start",
-          payload: { branch: branch ?? run.branch, prNumber: prNumber ?? run.prNumber },
-        },
-      }),
-    ]);
-
-    // Stub review worker: log and hand off to ops. Extend with tests/linters and PR comments later.
-    // eslint-disable-next-line no-console
-    console.log(`[review] stub processed run ${runId} for ${targetRepo}`);
-
-    await prisma.event.create({
-      data: {
-        runId,
-        type: "review:completed",
-        payload: { branch: branch ?? run.branch, prNumber: prNumber ?? run.prNumber },
-      },
-    });
-    await prisma.run.update({
-      where: { id: runId },
-      data: { phase: "ops", reviewStatus: "done", opsStatus: "queued" },
-    });
-    await opsQueue.add("ops.start", {
-      runId,
-      repo: targetRepo,
-      branch: branch ?? run.branch,
-      prNumber: prNumber ?? run.prNumber,
-    });
   },
   2,
 );

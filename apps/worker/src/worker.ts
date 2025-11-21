@@ -2,6 +2,7 @@ import { makeWorker, reviewQueue } from "../../../packages/shared/queue";
 import { PrismaClient } from "@prisma/client";
 import { ghInstallClient } from "../../../packages/shared/github";
 import { ALLOWED_REPOS, AUTO_MERGE_LOW_RISK } from "../../../packages/shared/policy";
+import { evaluateHitl } from "../../../orchestrator/policies/hitl";
 
 const prisma = new PrismaClient();
 const gh = ghInstallClient();
@@ -29,6 +30,7 @@ makeWorker(
   "dev",
   async (job: any) => {
     const { runId } = job.data as { runId: string };
+    const attempt = typeof job.attemptsMade === "number" ? job.attemptsMade + 1 : 1;
     const run = await prisma.run.findUnique({ where: { id: runId } });
     if (!run) return;
 
@@ -49,6 +51,32 @@ makeWorker(
       }),
     ]);
       throw new Error(`Repo not allowed: ${run.repo}`);
+    }
+
+    // Evaluate HITL before starting if required secrets are missing.
+    const missingSecret = !process.env.GITHUB_APP_ID || !process.env.GITHUB_INSTALLATION_ID || !process.env.GITHUB_PRIVATE_KEY;
+    const hitl = evaluateHitl({ missingSecret });
+    if (hitl.escalate) {
+      await prisma.$transaction([
+        prisma.run.update({
+          where: { id: runId },
+          data: {
+            state: "awaiting_unblock",
+            blockedReason: `HITL: ${hitl.reason}`,
+            phase: "dev",
+            reviewStatus: "blocked",
+            opsStatus: "blocked",
+          },
+        }),
+        prisma.event.create({
+          data: {
+            runId,
+            type: "hitl:escalated",
+            payload: { reason: hitl.reason, requestedInput: hitl.requestedInput },
+          },
+        }),
+      ]);
+      return;
     }
 
     await prisma.$transaction([
@@ -161,20 +189,41 @@ makeWorker(
         prNumber: (pr.data as any).number,
       });
     } catch (err: any) {
+      const hitlDecision = evaluateHitl({
+        failedTestAttempts: attempt,
+        explicitReason: err?.response?.data?.message ? String(err.response.data.message) : undefined,
+      });
       await prisma.$transaction([
         prisma.run.update({
           where: { id: runId },
           data: {
-            state: "awaiting_unblock",
+            state: hitlDecision.escalate ? "awaiting_unblock" : "awaiting_unblock",
             phase: "dev",
             reviewStatus: "blocked",
             opsStatus: "blocked",
-            blockedReason: String(err?.message ?? err),
+            blockedReason: hitlDecision.escalate
+              ? `HITL: ${hitlDecision.reason ?? String(err?.message ?? err)}`
+              : String(err?.message ?? err),
           },
         }),
         prisma.event.create({
           data: { runId, type: "dev:failed", payload: { error: String(err?.message ?? err) } },
         }),
+        hitlDecision.escalate
+          ? prisma.event.create({
+              data: {
+                runId,
+                type: "hitl:escalated",
+                payload: { reason: hitlDecision.reason, requestedInput: hitlDecision.requestedInput },
+              },
+            })
+          : prisma.event.create({
+              data: {
+                runId,
+                type: "hitl:pending",
+                payload: { note: "Awaiting unblock after failure" },
+              },
+            }),
       ]);
       throw err;
     }

@@ -9,11 +9,12 @@ export interface HitlEvaluationInput {
   destructiveChange?: boolean;
   failedTestAttempts?: number;
   ambiguousSpec?: boolean;
+  explicitReason?: string;
 }
 
 export interface HitlDecision {
   escalate: boolean;
-  reason?: HitlReason;
+  reason?: HitlReason | string;
   requestedInput?: string;
 }
 
@@ -23,6 +24,14 @@ export function evaluateHitl(
   input: HitlEvaluationInput,
   testRetryLimit: number = DEFAULT_TEST_RETRY_LIMIT,
 ): HitlDecision {
+  if (input.explicitReason) {
+    return {
+      escalate: true,
+      reason: input.explicitReason,
+      requestedInput: "Review the escalation reason and provide guidance.",
+    };
+  }
+
   if (input.missingSecret) {
     return {
       escalate: true,

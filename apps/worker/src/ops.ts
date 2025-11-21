@@ -1,6 +1,7 @@
 import { makeWorker } from "../../../packages/shared/queue";
 import { PrismaClient } from "@prisma/client";
 import { ALLOWED_REPOS } from "../../../packages/shared/policy";
+import { evaluateHitl } from "../../../orchestrator/policies/hitl";
 
 const prisma = new PrismaClient();
 
@@ -35,50 +36,115 @@ makeWorker(
     if (!run) return;
 
     const targetRepo = repo ?? run.repo;
+    const attempt = typeof job.attemptsMade === "number" ? job.attemptsMade + 1 : 1;
 
-    if (!ALLOWED_REPOS.has(targetRepo)) {
+    try {
+      if (!ALLOWED_REPOS.has(targetRepo)) {
+        await prisma.$transaction([
+          prisma.run.update({
+            where: { id: runId },
+            data: {
+              state: "awaiting_unblock",
+              blockedReason: "Repo not allowed (ops)",
+              phase: "ops",
+              opsStatus: "blocked",
+            },
+          }),
+          prisma.event.create({
+            data: { runId, type: "ops:failed", payload: { error: "Repo not allowed" } },
+          }),
+        ]);
+        throw new Error(`Repo not allowed for ops: ${run.repo}`);
+      }
+
+      // Evaluate HITL before starting ops.
+      const hitlPrecheck = evaluateHitl({
+        missingSecret:
+          !process.env.GITHUB_APP_ID || !process.env.GITHUB_PRIVATE_KEY || !process.env.GITHUB_INSTALLATION_ID,
+      });
+      if (hitlPrecheck.escalate) {
+        await prisma.$transaction([
+          prisma.run.update({
+            where: { id: runId },
+            data: {
+              state: "awaiting_unblock",
+              blockedReason: `HITL: ${hitlPrecheck.reason}`,
+              phase: "ops",
+              opsStatus: "blocked",
+            },
+          }),
+          prisma.event.create({
+            data: {
+              runId,
+              type: "hitl:escalated",
+              payload: { reason: hitlPrecheck.reason, requestedInput: hitlPrecheck.requestedInput },
+            },
+          }),
+        ]);
+        return;
+      }
+
+      await prisma.$transaction([
+        prisma.run.update({
+          where: { id: runId },
+          data: { phase: "ops", opsStatus: "running" },
+        }),
+        prisma.event.create({
+          data: {
+            runId,
+            type: "ops:start",
+            payload: { branch: branch ?? run.branch, prNumber: prNumber ?? run.prNumber },
+          },
+        }),
+      ]);
+
+      // Stub ops worker: log and mark run complete. Extend with CI/status gating and merge logic later.
+      // eslint-disable-next-line no-console
+      console.log(`[ops] stub processed run ${runId} for ${targetRepo}`);
+
+      await prisma.$transaction([
+        prisma.run.update({
+          where: { id: runId },
+          data: { state: "done", blockedReason: null, phase: "done", opsStatus: "done" },
+        }),
+        prisma.event.create({ data: { runId, type: "ops:completed", payload: {} } }),
+      ]);
+    } catch (err: any) {
+      const hitlDecision = evaluateHitl({
+        failedTestAttempts: attempt,
+        explicitReason: err?.response?.data?.message ? String(err.response.data.message) : undefined,
+      });
+
       await prisma.$transaction([
         prisma.run.update({
           where: { id: runId },
           data: {
             state: "awaiting_unblock",
-            blockedReason: "Repo not allowed (ops)",
+            blockedReason: hitlDecision.escalate
+              ? `HITL: ${hitlDecision.reason ?? String(err?.message ?? err)}`
+              : String(err?.message ?? err),
             phase: "ops",
             opsStatus: "blocked",
           },
         }),
         prisma.event.create({
-          data: { runId, type: "ops:failed", payload: { error: "Repo not allowed" } },
+          data: { runId, type: "ops:failed", payload: { error: String(err?.message ?? err) } },
         }),
+        hitlDecision.escalate
+          ? prisma.event.create({
+              data: {
+                runId,
+                type: "hitl:escalated",
+                payload: { reason: hitlDecision.reason, requestedInput: hitlDecision.requestedInput },
+              },
+            })
+          : prisma.event.create({
+              data: { runId, type: "hitl:pending", payload: { note: "Awaiting unblock after ops failure" } },
+            }),
       ]);
-      throw new Error(`Repo not allowed for ops: ${run.repo}`);
+
+      throw err;
     }
-
-    await prisma.$transaction([
-      prisma.run.update({
-        where: { id: runId },
-        data: { phase: "ops", opsStatus: "running" },
-      }),
-      prisma.event.create({
-        data: {
-          runId,
-          type: "ops:start",
-          payload: { branch: branch ?? run.branch, prNumber: prNumber ?? run.prNumber },
-        },
-      }),
-    ]);
-
-    // Stub ops worker: log and mark run complete. Extend with CI/status gating and merge logic later.
-    // eslint-disable-next-line no-console
-    console.log(`[ops] stub processed run ${runId} for ${targetRepo}`);
-
-    await prisma.$transaction([
-      prisma.run.update({
-        where: { id: runId },
-        data: { state: "done", blockedReason: null, phase: "done", opsStatus: "done" },
-      }),
-      prisma.event.create({ data: { runId, type: "ops:completed", payload: {} } }),
-    ]);
   },
   2,
 );
