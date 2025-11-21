@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4
@@ -24,6 +26,9 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Verify Source of Truth is updated
+        run: npm run check:sot
 
       - name: Build
         run: npm run build

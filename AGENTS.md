@@ -3,6 +3,14 @@
 ## Project Structure & Module Organization
 DevinSwarm is a Node 20+ TypeScript repo built around the orchestrator-first design in `CODEx_RUNBOOK.md`. Keep graph/state/policy code in `/orchestrator`, HTTP adapters under `/service`, persistence queues inside `/runtime/{queue,store,events}`, and low-level integrations inside `/tools`. Workers (`dev`, `reviewer`, `research`, `ops`, `scout`) live under `/workers/*`, prompts under `/prompts`, and docs under `/docs`. Place UI assets such as `service/public/hitl.html` under `service/public/` and keep `*.spec.ts` files adjacent to their targets.
 
+## Source of Truth & Codex Ritual
+- The single living plan/status doc is `docs/source-of-truth.md` on `main`. Do not create additional plan/checkpoint docs.
+- At the start of every Codex session in this repo, run `npm run bootstrap:codex` (fetch/prune, read SOT vs `origin/main`) and `npm run codex:context` (print SOT, git status/diff, recent events) so Codex is auto-hydrated.
+- Apply plan/decision/scope/status changes directly to `docs/source-of-truth.md` the same session; prepend to Session Log. If working on a branch, rebase the SOT from `main` first and merge it back early.
+- Archived historical docs live under `docs/archive/*.md`; the stubs in `docs/` point to the SOT.
+- Run `npm run check:sot` before pushing; CI runs the same check, and the PR template requires confirming the SOT update.
+- To force a clean sync to `origin/main`, set `CODEX_RESET_TO_ORIGIN_MAIN=1` before `npm run bootstrap:codex` (WARNING: discards local changes).
+
 ## Build, Test, and Development Commands
 - `npm ci` – sync dependencies for the orchestrator stack.
 - `npm run build` – compile TypeScript via `tsc -p tsconfig.json`.

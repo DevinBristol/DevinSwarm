@@ -14,7 +14,10 @@
     "db:push": "prisma db push",
     "lint": "echo 'add eslint later'",
     "dev": "nodemon apps/service/src/server.ts",
-    "start:dev-worker": "npm run start:worker"
+    "start:dev-worker": "npm run start:worker",
+    "bootstrap:codex": "pwsh -File scripts/codex_bootstrap.ps1",
+    "codex:context": "node scripts/codex_context.mjs",
+    "check:sot": "node scripts/check-sot-updated.mjs"
   },
   "engines": {
     "node": ">=20 <21",
@@ -41,6 +44,7 @@
     "fastify-healthcheck": "^4.4.0",
     "ioredis": "^5.4.1",
     "openai": "^4.77.0",
+    "pg": "^8.12.0",
     "pino": "^9.5.0",
     "uuid": "^11.0.3",
     "winston": "^3.15.0",
