@@ -39,6 +39,11 @@ export const runStateSchema = z.object({
   currentNode: z
     .enum(["intake", "plan", "dev-execute", "review", "ops", "report", "escalate"])
     .default("intake"),
+  iteration: z.number().int().positive().default(1),
+  maxIterations: z.number().int().positive().default(2),
+  devAssignee: z.string().nullable().optional(),
+  reviewerAssignee: z.string().nullable().optional(),
+  opsAssignee: z.string().nullable().optional(),
   tasks: z.array(taskSchema).default([]),
   retries: retriesSchema.default({
     plan: 0,

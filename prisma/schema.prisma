@@ -8,39 +8,39 @@ datasource db {
 }
 
 model Run {
-  id            String   @id @default(uuid())
-  repo          String
-  source        String   @default("manual")
-  title         String?
-  description   String?
-  planSummary   String?
-  state         RunState @default(queued)
-  phase         String   @default("intake")
-  branch        String?
-  currentNode   String   @default("intake")
-  prNumber      Int?
-  reviewStatus  String   @default("pending")
-  opsStatus     String   @default("pending")
-  retries       Json?
-  tasks         Json?
-  plan          Json?
-  artifacts     Json?
-  evaluation    Json?
-  devAssignee   String?
+  id               String    @id @default(uuid())
+  repo             String
+  source           String    @default("manual")
+  title            String?
+  description      String?
+  planSummary      String?
+  state            RunState  @default(queued)
+  phase            String    @default("intake")
+  branch           String?
+  currentNode      String    @default("intake")
+  prNumber         Int?
+  reviewStatus     String    @default("pending")
+  opsStatus        String    @default("pending")
+  retries          Json?
+  tasks            Json?
+  plan             Json?
+  artifacts        Json?
+  evaluation       Json?
+  devAssignee      String?
   reviewerAssignee String?
-  opsAssignee   String?
-  priority      Int      @default(0)
-  budgetUsd     Float    @default(5)
-  startedAt     DateTime?
-  completedAt   DateTime?
-  lastError     String?
-  statusHistory Json?
-  restartedFrom String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  blockedReason String?
-  labels        String[] @default([])
-  events        Event[]
+  opsAssignee      String?
+  priority         Int       @default(0)
+  budgetUsd        Float     @default(5)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  lastError        String?
+  statusHistory    Json?
+  restartedFrom    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  blockedReason    String?
+  labels           String[]  @default([])
+  events           Event[]
 }
 
 model Event {
@@ -66,4 +66,3 @@ enum RunState {
   done
   failed
 }
-

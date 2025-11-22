@@ -10,7 +10,7 @@ import type { RunInput, RunState } from "../state/runState.ts";
 type Task = RunState["tasks"][number];
 type Retries = RunState["retries"];
 
-export const DEFAULT_MAX_ITERATIONS = 2;
+export const DEFAULT_MAX_ITERATIONS = Number(process.env.MAX_ITERATIONS ?? 2);
 
 export const defaultRetries: Retries = {
   plan: 0,

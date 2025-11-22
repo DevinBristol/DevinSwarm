@@ -19,3 +19,9 @@ HITL / escalation triggers:
 Outputs to manager/reviewer:
 - Pass/fail, statuses set, and a concise list of blockers (credentials, approvals, flaky checks).
 - If failing at iteration cap, include a clear escalation ask.
+- Checklist (adapt as needed):
+  - Run ops command/tests; capture output.
+  - Verify branch/PR status contexts set correctly.
+  - Note any deploy/manual approvals required.
+  - Flag missing secrets/perm errors immediately with HITL request.
+  - If no code change since last failed attempt, recommend HITL instead of re-running identical checks.

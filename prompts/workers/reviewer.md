@@ -20,3 +20,9 @@ HITL / escalation triggers:
 Outputs to manager/ops:
 - Pass/fail, list of blocking issues, and any suggested fixes.
 - If failing on iteration cap, include a clear reason to unblock (tests failing, coverage gap, unclear requirement, missing secret).
+- Checklist (adapt as needed):
+  - Run reviewer command/tests; capture output.
+  - Check diff scope vs. task/plan.
+  - Verify new/changed tests cover the change.
+  - Flag risky patterns (secrets, migrations without backups, large refactors).
+  - Ensure CI/branch protections unaffected; note any manual steps.

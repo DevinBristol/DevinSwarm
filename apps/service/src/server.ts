@@ -112,6 +112,8 @@ app.get("/debug/env", async (req, rep) => {
 });
 
 app.get("/ui", async (_req, rep) => {
+  const maxIterations = Number(process.env.MAX_ITERATIONS ?? 2);
+
   const runs = await prisma.run.findMany({
     orderBy: { createdAt: "desc" },
     take: 30,
@@ -124,6 +126,10 @@ app.get("/ui", async (_req, rep) => {
     <td>${r.state}</td>
     <td>${r.phase ?? ""}</td>
     <td>${(r as any).iteration ?? ""}</td>
+    <td>${maxIterations}</td>
+    <td>${(r as any).devAssignee ?? ""}</td>
+    <td>${(r as any).reviewerAssignee ?? ""}</td>
+    <td>${(r as any).opsAssignee ?? ""}</td>
     <td>${r.reviewStatus ?? ""}</td>
     <td>${r.opsStatus ?? ""}</td>
     <td>${r.repo}</td>
@@ -153,6 +159,7 @@ app.get("/ui", async (_req, rep) => {
         <td>${e.createdAt.toISOString()}</td>
         <td>${e.runId}</td>
         <td>${e.type}</td>
+        <td>${(e.payload as any)?.iteration ?? ""}/${(e.payload as any)?.maxIterations ?? ""}</td>
         <td><pre style="white-space:pre-wrap; max-width:400px;">${JSON.stringify(e.payload)}</pre></td>
       </tr>`,
     )
@@ -172,7 +179,7 @@ app.get("/ui", async (_req, rep) => {
     <div id="intakeStatus"></div>
   </div>
   <table border=1 cellpadding=6>
-    <tr><th>Time</th><th>State</th><th>Phase</th><th>Iter</th><th>Review</th><th>Ops</th><th>Repo</th><th>Branch</th><th>PR</th><th>Description</th><th>Escalation</th><th>Blocked</th><th>Action</th></tr>
+    <tr><th>Time</th><th>State</th><th>Phase</th><th>Iter</th><th>MaxIter</th><th>Dev</th><th>Review</th><th>Ops</th><th>Repo</th><th>Branch</th><th>PR</th><th>Description</th><th>Escalation</th><th>Blocked</th><th>Action</th></tr>
     ${rows}
   </table>
   <h3 style="margin-top:16px;">Recent Events</h3>
