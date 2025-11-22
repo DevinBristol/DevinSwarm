@@ -77,9 +77,11 @@ const OrchestratorState = Annotation.Root({
   }),
   iteration: Annotation<number>({
     default: () => 1,
+    reducer: (_left, right) => right,
   }),
   maxIterations: Annotation<number>({
     default: () => DEFAULT_MAX_ITERATIONS,
+    reducer: (_left, right) => right,
   }),
 });
 

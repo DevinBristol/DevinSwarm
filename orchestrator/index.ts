@@ -7,8 +7,8 @@ import {
   runDevWorkflow,
   type StepLog,
   type WorkflowResult,
-} from "./graph/manager.graph.ts";
-import type { RunInput } from "./state/runState.ts";
+} from "./graph/manager.graph.js";
+import type { RunInput } from "./state/runState.js";
 
 export interface OrchestratorRunContext {
   prisma: PrismaClient;
