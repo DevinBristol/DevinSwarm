@@ -1,4 +1,4 @@
-import type { PrismaClient, Run } from "@prisma/client";
+import type { PrismaClient, Prisma, Run } from "@prisma/client";
 import { devQueue, opsQueue, reviewQueue } from "../../../packages/shared/queue";
 
 interface ResumeResult {
@@ -15,7 +15,7 @@ export async function resumeRunFromHitl(prisma: PrismaClient, runId: string): Pr
   let queue: ResumeResult["queue"];
 
   // Default updates common to all phases.
-  const data: Partial<Run> = {
+  const data: Prisma.RunUpdateInput = {
     state: "running",
     blockedReason: null,
   };
