@@ -79,8 +79,8 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 ## 3. Current Stage & Next Steps
 
 - **Current milestone:** M1 - Orchestrator & State Model (Phase 1).
-- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Basic resume test exists (`npm run test:orchestrator`); fuller transition tests still pending.
-- **Blockers:** GitHub App secrets are required for PR/status paths (runs block without them). Redis/Postgres must be running. Smoke log still missing.
+- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Basic resume test exists (`npm run test:orchestrator`); fuller transition tests still pending. Local smoke run completed (id `0f92821d-ad1c-4566-b31a-bf3f9a86b93d`).
+- **Blockers:** GitHub App secrets are required for PR/status paths (runs block without them). Redis/Postgres must be running. Need validated GitHub App creds before exercising PR/status path.
 - **Active work items:**
   - [ ] Add automated tests for `orchestrator/graph/manager.graph.ts` covering retry caps, status transitions, and event persistence.
   - [ ] Capture a current local smoke test log and link it here and in `SWARM_PING.md`.
@@ -89,7 +89,7 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 
 Default actions to pick up next:
 - [ ] Expand orchestrator transition tests (retry caps, HITL paths) beyond the new `npm run test:orchestrator`.
-- [ ] Record a fresh local or Render smoke log and link it in this runbook and `SWARM_PING.md`.
+- [ ] Record a fresh Render smoke log (local smoke recorded: run `0f92821d-ad1c-4566-b31a-bf3f9a86b93d`) and link it in this runbook and `SWARM_PING.md`.
 
 ## 4. Repo Map & Documentation Layout
 
