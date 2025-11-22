@@ -23,8 +23,13 @@ async function main() {
     history: [],
   });
   assert.strictEqual(full.state.status, "completed", "full run should complete");
+  const nodesVisited = full.steps.map((s) => s.node);
+  ["intake", "plan", "dev-execute", "review", "ops", "report"].forEach((n) =>
+    assert(nodesVisited.includes(n), `full run should include node ${n}`),
+  );
   assert(full.steps.some((s) => s.node === "review" && s.transition === "complete"), "review should complete");
   assert(full.steps.some((s) => s.node === "ops" && s.transition === "complete"), "ops should complete");
+  assert(full.steps.every((s) => Boolean(s.timestamp)), "steps should carry timestamps");
 
   // Retry cap: force dev to exceed limit
   const devRetryState = await runDevWorkflow({
@@ -32,6 +37,8 @@ async function main() {
     retries: { ...defaultRetries, dev: 2 }, // already at limit
   });
   assert.strictEqual(devRetryState.state.status, "failed", "dev retry cap should fail run");
+  const devFail = devRetryState.steps.find((s) => s.node === "dev-execute" && s.transition === "fail");
+  assert(devFail, "dev retry cap should log fail transition");
 
   // Blocked path should stop progression; we assert detection before running.
   const historyBlocked = [
