@@ -79,8 +79,8 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 ## 3. Current Stage & Next Steps
 
 - **Current milestone:** M1 - Orchestrator & State Model (Phase 1).
-- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Basic resume test exists (`npm run test:orchestrator`); fuller transition tests still pending. Local smoke run completed (id `0f92821d-ad1c-4566-b31a-bf3f9a86b93d`). Render smoke succeeded after reviewer/ops low-heap tuning: run `1eaab2fd-5760-4e2d-a798-74e1727c17e3` (PR #19) completed review/ops. Older Render smokes (`64addeb2-46ae-4092-ba6d-d9ed15248568`, `f36544e0-f8cb-4487-8c8a-9e8e3d532bfc`) hit reviewer OOM and can be closed or rerun if desired.
-- **Blockers:** GitHub App secrets are present locally/Render. Redis/Postgres must be running. Render smoke needs unblock/resolution for review test failures.
+- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Basic resume test exists (`npm run test:orchestrator`); fuller transition tests still pending. Local smoke run completed (id `0f92821d-ad1c-4566-b31a-bf3f9a86b93d`). Render smokes succeeded after reviewer/ops low-heap tuning: `1eaab2fd-5760-4e2d-a798-74e1727c17e3` (PR #19) and `f36544e0-f8cb-4487-8c8a-9e8e3d532bfc` completed review/ops. Older OOM run `64addeb2-46ae-4092-ba6d-d9ed15248568` can be closed.
+- **Blockers:** GitHub App secrets are present locally/Render. Redis/Postgres must be running. Need broader transition tests.
 - **Active work items:**
   - [ ] Add automated tests for `orchestrator/graph/manager.graph.ts` covering retry caps, status transitions, and event persistence.
   - [ ] Capture a current local smoke test log and link it here and in `SWARM_PING.md`.
@@ -89,7 +89,7 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 
 Default actions to pick up next:
 - [ ] Expand orchestrator transition tests (retry caps, HITL paths) beyond the new `npm run test:orchestrator`.
-- [ ] Expand Render coverage if needed (prior OOM runs `64addeb2-46ae-4092-ba6d-d9ed15248568`, `f36544e0-f8cb-4487-8c8a-9e8e3d532bfc` can be closed/reran); local smoke recorded (`0f92821d-ad1c-4566-b31a-bf3f9a86b93d`), Render smoke succeeded (`1eaab2fd-5760-4e2d-a798-74e1727c17e3`, PR #19).
+- [ ] Close or archive the old Render OOM run `64addeb2-46ae-4092-ba6d-d9ed15248568` (not rerun). Local smoke recorded (`0f92821d-ad1c-4566-b31a-bf3f9a86b93d`); Render smokes succeeded (`1eaab2fd-5760-4e2d-a798-74e1727c17e3`, PR #19) and (`f36544e0-f8cb-4487-8c8a-9e8e3d532bfc`).
 
 ## 4. Repo Map & Documentation Layout
 
