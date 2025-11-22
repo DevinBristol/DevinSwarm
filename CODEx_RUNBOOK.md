@@ -79,19 +79,20 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 ## 3. Current Stage & Next Steps
 
 - **Current milestone:** M1 - Orchestrator & State Model (Phase 1).
-- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Tests: `npm run test:orchestrator` (resume) and `npm run test:orchestrator-transitions` (node order, retry cap, blocked history). Local smoke run completed (id `0f92821d-ad1c-4566-b31a-bf3f9a86b93d`). Render smokes succeeded after reviewer/ops low-heap tuning: `1eaab2fd-5760-4e2d-a798-74e1727c17e3` (PR #19) and `f36544e0-f8cb-4487-8c8a-9e8e3d532bfc` completed review/ops. Older OOM run `64addeb2-46ae-4092-ba6d-d9ed15248568` archived/closed.
-- **Blockers:** GitHub App secrets are present locally/Render. Redis/Postgres must be running. Broader transition/HITL tests still desired.
+- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Tests: `npm run test:orchestrator` (resume + event persistence/HITL checks via `scripts/run-ts-node.js`) and `npm run test:orchestrator-transitions` (node order, retry cap, blocked history). Local smoke run completed (id `0f92821d-ad1c-4566-b31a-bf3f9a86b93d`); latest local test log: `docs/logs/local-smoke-2025-11-21.md`. Render smokes succeeded after reviewer/ops low-heap tuning: `1eaab2fd-5760-4e2d-a798-74e1727c17e3` (PR #19) and `f36544e0-f8cb-4487-8c8a-9e8e3d532bfc` completed review/ops. Older OOM run `64addeb2-46ae-4092-ba6d-d9ed15248568` archived/closed.
+- **Blockers:** GitHub App secrets are present locally/Render. Redis/Postgres must be running. `tsx`/esbuild spawn errors on Windows are bypassed by `scripts/run-ts-node.js` (ts-node transpile-only); npm prints a harmless `npm-prefix` warning after scripts.
 - **Active work items:**
-  - [ ] Add automated tests for `orchestrator/graph/manager.graph.ts` covering retry caps, status transitions, and event persistence.
-  - [ ] Capture a current local smoke test log and link it here and in `SWARM_PING.md`.
-  - [ ] Add HITL/event-persistence focused checks (blocked paths, event payload assertions).
-  - [ ] Keep orchestrator test scripts (`test:orchestrator`, `test:orchestrator-transitions`) current with graph changes.
+  - [x] Add automated tests for `orchestrator/graph/manager.graph.ts` covering retry caps, status transitions, and event persistence.
+  - [x] Capture a current local smoke test log and link it here and in `SWARM_PING.md`.
+  - [x] Add HITL/event-persistence focused checks (blocked paths, event payload assertions).
+  - [x] Keep orchestrator test scripts (`test:orchestrator`, `test:orchestrator-transitions`) current with graph changes.
+  - [x] Investigate and remediate `tsx`/esbuild spawn failures on Windows so start/test scripts run without the ts-node fallback (current approach: use `scripts/run-ts-node.js` runner).
 
 ### Next Steps for Codex
 
 Default actions to pick up next:
-- [ ] Expand orchestrator transition tests (retry caps, HITL paths) beyond the new `npm run test:orchestrator`.
-- [ ] Close or archive the old Render OOM run `64addeb2-46ae-4092-ba6d-d9ed15248568` (not rerun). Local smoke recorded (`0f92821d-ad1c-4566-b31a-bf3f9a86b93d`); Render smokes succeeded (`1eaab2fd-5760-4e2d-a798-74e1727c17e3`, PR #19) and (`f36544e0-f8cb-4487-8c8a-9e8e3d532bfc`).
+- [ ] If desired, lift the OS policy blocking `child_process.spawn` (EPERM) so `tsx`/esbuild can run without the ts-node fallback; current runner works but `npm-prefix` warning remains harmless.
+- [x] Close or archive the old Render OOM run `64addeb2-46ae-4092-ba6d-d9ed15248568` (not rerun). Local smoke recorded (`0f92821d-ad1c-4566-b31a-bf3f9a86b93d`); Render smokes succeeded (`1eaab2fd-5760-4e2d-a798-74e1727c17e3`, PR #19) and (`f36544e0-f8cb-4487-8c8a-9e8e3d532bfc`).
 
 ## 4. Repo Map & Documentation Layout
 

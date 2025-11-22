@@ -1,18 +1,19 @@
 #!/usr/bin/env tsx
 import assert from "assert";
-import { runDevWorkflow } from "../orchestrator/graph/manager.graph.js";
+import { runDevWorkflow, type NodeName } from "../orchestrator/graph/manager.graph.ts";
 
 async function main() {
   const baseInput = {
-    runId: "test-run",
+    id: "test-run",
     repo: "DevinBristol/DevinSwarm",
     branch: "main",
     title: "Test resume",
     description: "Test orchestrator resume from mid-run",
     planSummary: "Test plan",
+    source: "manual",
     status: "queued" as const,
     phase: "intake",
-    currentNode: "intake",
+    currentNode: "intake" as NodeName,
     tasks: [],
     retries: undefined,
   };
@@ -30,7 +31,7 @@ async function main() {
 
   // Simulate crash after review completion; resume at ops using saved snapshot/history.
   const resumed = await runDevWorkflow({
-    runId: baseInput.runId,
+    id: baseInput.id,
     repo: baseInput.repo,
     branch: baseInput.branch,
     title: baseInput.title,
@@ -42,7 +43,7 @@ async function main() {
     tasks: lastSnapshot.tasks,
     retries: lastSnapshot.retries,
     history: upToReview,
-    startNode: "ops",
+    startNode: "ops" as NodeName,
   });
 
   assert.strictEqual(resumed.state.status, "completed", "resumed run should complete");

@@ -1,16 +1,17 @@
 #!/usr/bin/env tsx
 import assert from "assert";
-import { runDevWorkflow, defaultRetries } from "../orchestrator/graph/manager.graph.js";
-import type { StepLog } from "../orchestrator/graph/manager.graph.js";
+import { runDevWorkflow, defaultRetries } from "../orchestrator/graph/manager.graph.ts";
+import type { StepLog } from "../orchestrator/graph/manager.graph.ts";
 
 async function main() {
   const baseInput = {
-    runId: "transition-test",
+    id: "transition-test",
     repo: "DevinBristol/DevinSwarm",
     branch: "main",
     title: "Transition test",
     description: "Test transitions and retry caps",
     planSummary: "Test plan",
+    source: "manual",
     status: "queued" as const,
     phase: "intake",
     currentNode: "intake",
@@ -30,6 +31,16 @@ async function main() {
   );
   assert(full.steps.some((s) => s.node === "review" && s.transition === "complete"), "review should complete");
   assert(full.steps.some((s) => s.node === "ops" && s.transition === "complete"), "ops should complete");
+  ["dev", "review", "ops"].forEach((role) => {
+    const task = full.state.tasks.find((t) => t.role === role);
+    assert(task?.status === "done", `task for ${role} should be marked done`);
+  });
+  ["plan", "dev", "review", "ops"].forEach((role) => {
+    assert(
+      typeof (full.state.retries as any)[role] === "number" && (full.state.retries as any)[role] >= 1,
+      `retry counter for ${role} should be recorded`,
+    );
+  });
   assert(full.steps.every((s) => Boolean(s.timestamp)), "steps should carry timestamps");
   assert(
     full.steps.every((s) => s.snapshot.planSummary !== undefined && s.snapshot.retries !== undefined),

@@ -5,11 +5,11 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc --noEmit",
-    "start:service": "tsx apps/service/src/server.ts",
-    "start:worker": "tsx apps/worker/src/worker.ts",
-    "start:reviewer-worker": "tsx apps/worker/src/reviewer.ts",
-    "start:ops-worker": "tsx apps/worker/src/ops.ts",
-    "start:scout": "tsx apps/scout/src/scout.ts",
+    "start:service": "node scripts/run-ts-node.js apps/service/src/server.ts",
+    "start:worker": "node scripts/run-ts-node.js apps/worker/src/worker.ts",
+    "start:reviewer-worker": "node scripts/run-ts-node.js apps/worker/src/reviewer.ts",
+    "start:ops-worker": "node scripts/run-ts-node.js apps/worker/src/ops.ts",
+    "start:scout": "node scripts/run-ts-node.js apps/scout/src/scout.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "lint": "echo 'add eslint later'",
@@ -18,8 +18,9 @@
     "bootstrap:codex": "pwsh -File scripts/codex_bootstrap.ps1",
     "codex:context": "node scripts/codex_context.mjs",
     "check:sot": "node scripts/check-sot-updated.mjs",
-    "test:orchestrator": "tsx scripts/test-orchestrator-resume.ts",
-    "test:orchestrator-transitions": "tsx scripts/test-orchestrator-transitions.ts"
+    "test:orchestrator": "node scripts/run-ts-node.js scripts/test-orchestrator-resume.ts && node scripts/run-ts-node.js scripts/test-orchestrator-events.ts",
+    "test:orchestrator-events": "node scripts/run-ts-node.js scripts/test-orchestrator-events.ts",
+    "test:orchestrator-transitions": "node scripts/run-ts-node.js scripts/test-orchestrator-transitions.ts"
   },
   "engines": {
     "node": ">=20 <21",
