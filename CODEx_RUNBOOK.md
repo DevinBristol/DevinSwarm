@@ -84,6 +84,7 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 - **Active work items:**
   - [ ] Add automated tests for `orchestrator/graph/manager.graph.ts` covering retry caps, status transitions, and event persistence.
   - [ ] Capture a current local smoke test log and link it here and in `SWARM_PING.md`.
+  - [ ] Archive old Render OOM run `64addeb2-46ae-4092-ba6d-d9ed15248568` (replaced by successful runs).
 
 ### Next Steps for Codex
 

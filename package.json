@@ -18,7 +18,8 @@
     "bootstrap:codex": "pwsh -File scripts/codex_bootstrap.ps1",
     "codex:context": "node scripts/codex_context.mjs",
     "check:sot": "node scripts/check-sot-updated.mjs",
-    "test:orchestrator": "tsx scripts/test-orchestrator-resume.ts"
+    "test:orchestrator": "tsx scripts/test-orchestrator-resume.ts",
+    "test:orchestrator-transitions": "tsx scripts/test-orchestrator-transitions.ts"
   },
   "engines": {
     "node": ">=20 <21",
