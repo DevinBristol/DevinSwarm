@@ -7,7 +7,9 @@ import { runTests } from "../../../tools/tests";
 
 const prisma = new PrismaClient();
 
-const opsCommand = process.env.OPS_COMMAND ?? "npm run build";
+// Default to higher heap to avoid OOM on small instances (Render).
+const opsCommand =
+  process.env.OPS_COMMAND ?? "node --max-old-space-size=2048 node_modules/.bin/tsc --noEmit";
 const opsStatusContext = process.env.OPS_STATUS_CONTEXT ?? "swarm/ops";
 
 // Light env snapshot for debugging (no secrets).

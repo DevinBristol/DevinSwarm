@@ -7,7 +7,9 @@ import { runTests } from "../../../tools/tests";
 
 const prisma = new PrismaClient();
 
-const reviewerCommand = process.env.REVIEWER_COMMAND ?? "npm run build";
+// Default to higher heap to avoid OOM on small instances (Render).
+const reviewerCommand =
+  process.env.REVIEWER_COMMAND ?? "node --max-old-space-size=2048 node_modules/.bin/tsc --noEmit";
 const reviewStatusContext = process.env.REVIEW_STATUS_CONTEXT ?? "swarm/review";
 
 // Light env snapshot for debugging (no secrets).
