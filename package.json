@@ -46,6 +46,7 @@
     "fastify": "^4.28.1",
     "fastify-healthcheck": "^4.4.0",
     "ioredis": "^5.4.1",
+    "msgpackr": "1.11.5",
     "openai": "^4.77.0",
     "pg": "^8.12.0",
     "pino": "^9.5.0",

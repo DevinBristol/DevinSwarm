@@ -85,7 +85,7 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
   - [x] Define and encode self-iteration policy (when to replan vs HITL vs fail) in this runbook and in `prompts/manager.md` (plus worker prompts).
   - [x] Instrument event stream/UI to emit iteration metadata and reasons and surface them in `/ui`.
   - [x] Harden manager/dev/reviewer/ops prompts to respect iteration limits and self-iteration policy.
-  - [ ] (Optional) Pin `msgpackr` once upstream publishes a fixed build; current workaround relies on `--ignore-scripts`.
+  - [x] Pin `msgpackr` to 1.11.5 until upstream prepare is fixed (Cloud/CI still use `ci:install` to skip prepare).
 
 ### M1 state model & event schema (reference)
 - **Run status mapping:** Graph statuses map to Prisma `Run.state` (`queued`→queued, `running`→running, `blocked`→awaiting_unblock, `completed`→done, `failed`→failed). `phase` and `currentNode` mirror the last node executed.
