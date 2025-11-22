@@ -146,6 +146,7 @@ async function testEventPersistence(): Promise<void> {
   assert(planComplete?.payload?.snapshot?.planSummary, "plan summary should be present in event payload");
   assert(planComplete?.payload?.snapshot?.tasks, "tasks should be present in payload snapshot");
   assert.strictEqual(planComplete?.payload?.iteration, 1, "iteration should be present in event payload");
+  assert(typeof planComplete?.payload?.durationMs === "number", "duration should be present in event payload");
 
   const finalEvent = prisma.events[prisma.events.length - 1];
   assert.strictEqual(finalEvent.type, "orchestrator:completed", "final event should be orchestrator:completed");

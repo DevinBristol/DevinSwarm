@@ -179,6 +179,12 @@ export async function runOrchestratorForRun(
             iteration: state.iteration ?? 1,
             maxIterations: state.maxIterations ?? DEFAULT_MAX_ITERATIONS,
             snapshot: step.snapshot,
+            durationMs: step.durationMs ?? null,
+            assignees: {
+              dev: (state as any).devAssignee ?? null,
+              reviewer: (state as any).reviewerAssignee ?? null,
+              ops: (state as any).opsAssignee ?? null,
+            },
           },
         },
       }),

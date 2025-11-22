@@ -10,7 +10,15 @@ import type { RunInput, RunState } from "../state/runState.ts";
 type Task = RunState["tasks"][number];
 type Retries = RunState["retries"];
 
-export const DEFAULT_MAX_ITERATIONS = Number(process.env.MAX_ITERATIONS ?? 2);
+const parseLimit = (val: string | undefined, fallback: number): number => {
+  const n = Number(val);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
+export const DEFAULT_MAX_ITERATIONS = parseLimit(
+  process.env.MAX_ITERATIONS,
+  2,
+);
 
 export const defaultRetries: Retries = {
   plan: 0,
@@ -20,10 +28,10 @@ export const defaultRetries: Retries = {
 };
 
 const retryLimits: Retries = {
-  plan: 2,
-  dev: 2,
-  review: 1,
-  ops: 1,
+  plan: parseLimit(process.env.RETRY_LIMIT_PLAN, 2),
+  dev: parseLimit(process.env.RETRY_LIMIT_DEV, 2),
+  review: parseLimit(process.env.RETRY_LIMIT_REVIEW, 1),
+  ops: parseLimit(process.env.RETRY_LIMIT_OPS, 1),
 };
 
 const bumpTaskStatus = (
@@ -97,6 +105,7 @@ export interface StepLog {
   reason?: string;
   snapshot: StateSnapshot;
   timestamp: string;
+  durationMs?: number;
 }
 
 const intakeNode = async (
@@ -404,7 +413,9 @@ export async function runDevWorkflow(
       state = { ...state, retries: nextRetries };
     }
 
+    const started = Date.now();
     const patch = await fn(state);
+    const durationMs = Date.now() - started;
     state = { ...state, ...patch };
     const completeStep: StepLog = {
       node: nodeName,
@@ -415,6 +426,7 @@ export async function runDevWorkflow(
       transition: state.status === "blocked" ? "blocked" : "complete",
       snapshot: snapshot(),
       timestamp: new Date().toISOString(),
+      durationMs,
     };
     steps.push(completeStep);
     if (input.onStep) {

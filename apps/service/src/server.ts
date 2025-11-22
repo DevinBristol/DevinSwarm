@@ -111,12 +111,23 @@ app.get("/debug/env", async (req, rep) => {
   return envSnapshot;
 });
 
-app.get("/ui", async (_req, rep) => {
+app.get("/ui", async (req, rep) => {
   const maxIterations = Number(process.env.MAX_ITERATIONS ?? 2);
+  const q: any = req.query ?? {};
+  const stateFilter = q.state ? String(q.state) : undefined;
+  const phaseFilter = q.phase ? String(q.phase) : undefined;
+  const iterFilter = q.iteration ? Number(q.iteration) : undefined;
+  const runIdFilter = q.runId ? String(q.runId) : undefined;
 
   const runs = await prisma.run.findMany({
+    where: {
+      ...(stateFilter ? { state: stateFilter } : {}),
+      ...(phaseFilter ? { phase: phaseFilter } : {}),
+      ...(iterFilter ? { statusHistory: { path: ["iteration"], equals: iterFilter } as any } : {}),
+      ...(runIdFilter ? { id: { contains: runIdFilter } as any } : {}),
+    },
     orderBy: { createdAt: "desc" },
-    take: 30,
+    take: 50,
   });
   const rows = runs
     .map(
@@ -178,6 +189,17 @@ app.get("/ui", async (_req, rep) => {
     </form>
     <div id="intakeStatus"></div>
   </div>
+  <div style="margin-bottom:12px;">
+    <h4>Filters</h4>
+    <form id="filterForm">
+      <label>State <input name="state" value="${stateFilter ?? ""}" /></label>
+      <label>Phase <input name="phase" value="${phaseFilter ?? ""}" /></label>
+      <label>Iteration <input name="iteration" value="${iterFilter ?? ""}" /></label>
+      <label>Run ID contains <input name="runId" value="${runIdFilter ?? ""}" /></label>
+      <button type="submit">Apply</button>
+      <button type="button" onclick="clearFilters()">Clear</button>
+    </form>
+  </div>
   <table border=1 cellpadding=6>
     <tr><th>Time</th><th>State</th><th>Phase</th><th>Iter</th><th>MaxIter</th><th>Dev</th><th>Review</th><th>Ops</th><th>Repo</th><th>Branch</th><th>PR</th><th>Description</th><th>Escalation</th><th>Blocked</th><th>Action</th></tr>
     ${rows}
@@ -212,6 +234,14 @@ app.get("/ui", async (_req, rep) => {
       } else {
         statusEl.textContent = 'Failed: ' + resp.status;
       }
+    }
+    document.getElementById('filterForm').addEventListener('submit', (evt) => {
+      evt.preventDefault();
+      const data = new URLSearchParams(new FormData(document.getElementById('filterForm')));
+      window.location = '/ui?' + data.toString();
+    });
+    function clearFilters() {
+      window.location = '/ui';
     }
   </script>`;
 
