@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import assert from "assert";
 import { runDevWorkflow, defaultRetries } from "../orchestrator/graph/manager.graph.js";
+import type { StepLog } from "../orchestrator/graph/manager.graph.js";
 
 async function main() {
   const baseInput = {
@@ -30,6 +31,10 @@ async function main() {
   assert(full.steps.some((s) => s.node === "review" && s.transition === "complete"), "review should complete");
   assert(full.steps.some((s) => s.node === "ops" && s.transition === "complete"), "ops should complete");
   assert(full.steps.every((s) => Boolean(s.timestamp)), "steps should carry timestamps");
+  assert(
+    full.steps.every((s) => s.snapshot.planSummary !== undefined && s.snapshot.retries !== undefined),
+    "snapshots should carry planSummary and retries",
+  );
 
   // Retry cap: force dev to exceed limit
   const devRetryState = await runDevWorkflow({
@@ -39,37 +44,44 @@ async function main() {
   assert.strictEqual(devRetryState.state.status, "failed", "dev retry cap should fail run");
   const devFail = devRetryState.steps.find((s) => s.node === "dev-execute" && s.transition === "fail");
   assert(devFail, "dev retry cap should log fail transition");
+  assert(
+    devFail?.reason === "retry limit exceeded for dev-execute",
+    "fail transition should include retry limit reason",
+  );
 
   // Blocked path should stop progression; we assert detection before running.
-  const historyBlocked = [
-    {
-      node: "plan",
+  const blockedStep: StepLog = {
+    node: "plan",
+    status: "blocked",
+    phase: "plan",
+    currentNode: "plan",
+    retries: defaultRetries,
+    transition: "blocked",
+    reason: "test block",
+    snapshot: {
       status: "blocked",
       phase: "plan",
       currentNode: "plan",
       retries: defaultRetries,
-      transition: "blocked" as const,
-      reason: "test block",
-      snapshot: {
-        status: "blocked",
-        phase: "plan",
-        currentNode: "plan",
-        retries: defaultRetries,
-        tasks: [],
-        planSummary: "blocked",
-        title: "blocked",
-        description: "blocked",
-        branch: "main",
-        repo: baseInput.repo,
-      },
-      timestamp: new Date().toISOString(),
+      tasks: [],
+      planSummary: "blocked",
+      title: "blocked",
+      description: "blocked",
+      branch: "main",
+      repo: baseInput.repo,
     },
-  ];
+    timestamp: new Date().toISOString(),
+  };
 
-  const hasBlocked = historyBlocked.some(
-    (s) => s.transition === "blocked" || s.transition === "fail",
-  );
-  assert.strictEqual(hasBlocked, true, "blocked history should be detected before running");
+  const blockedResult = await runDevWorkflow({
+    ...baseInput,
+    history: [blockedStep],
+    startNode: null,
+  });
+  const lastBlocked = blockedResult.steps.find((s) => s.transition === "blocked");
+  assert(lastBlocked, "blocked history should be preserved in steps");
+  assert(lastBlocked?.reason === "test block", "blocked reason should be preserved");
+  assert.strictEqual(blockedResult.steps[0].transition, "blocked", "blocked history should remain first step");
 
   // eslint-disable-next-line no-console
   console.log("orchestrator transition tests passed");

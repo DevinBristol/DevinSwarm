@@ -85,6 +85,7 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
   - [ ] Add automated tests for `orchestrator/graph/manager.graph.ts` covering retry caps, status transitions, and event persistence.
   - [ ] Capture a current local smoke test log and link it here and in `SWARM_PING.md`.
   - [ ] Add HITL/event-persistence focused checks (blocked paths, event payload assertions).
+  - [ ] Keep orchestrator test scripts (`test:orchestrator`, `test:orchestrator-transitions`) current with graph changes.
 
 ### Next Steps for Codex
 
