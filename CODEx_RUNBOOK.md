@@ -52,8 +52,8 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 - [x] HITL policy stub for missing secrets/test failures plus UI unblock endpoint.
 - [ ] Automated tests for orchestrator transitions, retry limits, and HITL/resume flows.
 - [ ] Document the state model and event schema (Prisma + docs) and clarify retry budgets.
-- [ ] Add an integration test that simulates a mid-run crash and verifies resumability from the DB.
-- [ ] Document and script the resume trigger after `awaiting_unblock` (queue kick + state resume).
+- [x] Add an integration test that simulates a mid-run crash and verifies resumability from the DB (`npm run test:orchestrator`).
+- [x] Document and script the resume trigger after `awaiting_unblock` (queue kick + state resume).
 - [ ] Capture a fresh local smoke test log for the M1 stack (service + workers + queue + DB).
 
 **M2 - Agent Roles & Graph Stabilized**
@@ -79,18 +79,16 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 ## 3. Current Stage & Next Steps
 
 - **Current milestone:** M1 - Orchestrator & State Model (Phase 1).
-- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired; HITL stub blocks on missing secrets/test failures; unblock is manual and tests are not yet automated.
-- **Blockers:** GitHub App secrets are required for PR/status paths (runs block without them). Redis/Postgres must be running.
+- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Basic resume test exists (`npm run test:orchestrator`); fuller transition tests still pending.
+- **Blockers:** GitHub App secrets are required for PR/status paths (runs block without them). Redis/Postgres must be running. Smoke log still missing.
 - **Active work items:**
   - [ ] Add automated tests for `orchestrator/graph/manager.graph.ts` covering retry caps, status transitions, and event persistence.
-  - [ ] Document and/or implement the resume trigger after `/runs/:id/unblock` so runs leave `awaiting_unblock` reliably.
   - [ ] Capture a current local smoke test log and link it here and in `SWARM_PING.md`.
 
 ### Next Steps for Codex
 
 Default actions to pick up next:
-- [ ] Build and run orchestrator transition/resume tests for M1 (cover retries, status persistence, HITL paths).
-- [ ] Implement or document the unblock resume trigger so `awaiting_unblock` runs progress without manual queue nudges.
+- [ ] Expand orchestrator transition tests (retry caps, HITL paths) beyond the new `npm run test:orchestrator`.
 - [ ] Record a fresh local or Render smoke log and link it in this runbook and `SWARM_PING.md`.
 
 ## 4. Repo Map & Documentation Layout

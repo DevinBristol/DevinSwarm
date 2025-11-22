@@ -20,3 +20,4 @@ Purpose: keep documentation accurate for humans and Codex, eliminate context/sco
 ## Progress log
 - 2025-11-21: Merged canibalized runbooks into `CODEx_RUNBOOK.md`, refreshed `AGENTS.md`, created `docs/INDEX.md`, and captured this plan to track ongoing doc guardrails.
 - 2025-11-21: Added `scripts/check-sot-updated.mjs` (wired to `npm run check:sot`), enabled in CI, and added pre-push hook samples for local enforcement.
+- 2025-11-21: Implemented HITL unblock resume enqueue + resume test (`npm run test:orchestrator`); pending smoke log updates.

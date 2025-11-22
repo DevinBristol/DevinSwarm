@@ -5,6 +5,7 @@ import { devQueue } from "../../../packages/shared/queue";
 import { registerWebhook } from "./webhooks";
 import { randomUUID } from "crypto";
 import { runOrchestratorForRun } from "../../../orchestrator";
+import { resumeRunFromHitl } from "./resume";
 
 const prisma = new PrismaClient();
 const app = Fastify({ logger: true });
@@ -81,16 +82,10 @@ app.post("/runs/:id/unblock", async (req, rep) => {
   const token = (req.headers["x-ui-token"] ?? "") as string;
   if (token !== process.env.UI_TOKEN) return rep.code(401).send({ error: "unauthorized" });
   const id = (req.params as any).id;
-  await prisma.$transaction([
-    prisma.run.update({
-      where: { id },
-      data: { state: "running", blockedReason: null },
-    }),
-    prisma.event.create({
-      data: { runId: id, type: "hitl:unblocked", payload: {} },
-    }),
-  ]);
-  return { ok: true };
+  const result = await resumeRunFromHitl(prisma, id);
+  if (result.status === "not_found") return rep.code(404).send({ error: "not found" });
+  if (result.status === "skipped") return { ok: true, note: "run not awaiting_unblock" };
+  return { ok: true, queue: result.queue };
 });
 
 app.get("/debug/env", async (req, rep) => {

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
+import { resumeRunFromHitl } from "./resume";
 
 const prisma = new PrismaClient();
 
@@ -24,10 +25,7 @@ export function registerWebhook(app: FastifyInstance): void {
       const runIdMatch = title.match(/run\s*([0-9a-fA-F-]{6,})/i);
       const runId = runIdMatch?.[1];
       if (unblock && runId) {
-        await prisma.run.update({
-          where: { id: runId },
-          data: { state: "running", blockedReason: null },
-        });
+        await resumeRunFromHitl(prisma, runId);
       }
     }
 
