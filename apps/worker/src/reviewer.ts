@@ -4,8 +4,10 @@ import { ALLOWED_REPOS } from "../../../packages/shared/policy";
 import { makeWorker, opsQueue } from "../../../packages/shared/queue";
 import { createPrComment, ghInstallClient, setCommitStatus } from "../../../packages/shared/github";
 import { runTests } from "../../../tools/tests";
+import os from "os";
 
 const prisma = new PrismaClient();
+const workerId = process.env.WORKER_ID ?? `review-worker-${os.hostname()}`;
 
 // Default command tuned for 512MB instances (Render): smaller heap cap + skip lib checks.
 const reviewerCommand =
@@ -68,6 +70,12 @@ makeWorker(
 
     const run = await prisma.run.findUnique({ where: { id: runId } });
     if (!run) return;
+
+    const claimed = await prisma.run.updateMany({
+      where: { id: runId, OR: [{ reviewerAssignee: null }, { reviewerAssignee: workerId }] },
+      data: { reviewerAssignee: workerId },
+    });
+    if (claimed.count === 0) return;
 
     const targetRepo = repo ?? run.repo;
     const attempt = typeof job.attemptsMade === "number" ? job.attemptsMade + 1 : 1;

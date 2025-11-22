@@ -4,9 +4,11 @@ import { ghInstallClient } from "../../../packages/shared/github";
 import { ALLOWED_REPOS, AUTO_MERGE_LOW_RISK } from "../../../packages/shared/policy";
 import { evaluateHitl } from "../../../orchestrator/policies/hitl";
 import { createWorkspace, cleanupWorkspace, WorkspacePaths } from "../../../tools/fs";
+import os from "os";
 
 const prisma = new PrismaClient();
 const gh = ghInstallClient();
+const workerId = process.env.WORKER_ID ?? `dev-worker-${os.hostname()}`;
 
 // Log a safe snapshot of worker-relevant env (no secret content).
 // This is useful to compare local vs Render configuration via logs.
@@ -34,6 +36,19 @@ makeWorker(
     const attempt = typeof job.attemptsMade === "number" ? job.attemptsMade + 1 : 1;
     const run = await prisma.run.findUnique({ where: { id: runId } });
     if (!run) return;
+
+    // Reservation: ensure only one dev worker processes the run at a time.
+    const claimed = await prisma.run.updateMany({
+      where: {
+        id: runId,
+        OR: [{ devAssignee: null }, { devAssignee: workerId }],
+      },
+      data: { devAssignee: workerId },
+    });
+    if (claimed.count === 0) {
+      // Another worker owns this run; skip.
+      return;
+    }
 
     let workspace: WorkspacePaths | null = null;
 
