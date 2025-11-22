@@ -123,6 +123,7 @@ app.get("/ui", async (_req, rep) => {
     <td>${r.createdAt.toISOString()}</td>
     <td>${r.state}</td>
     <td>${r.phase ?? ""}</td>
+    <td>${(r as any).iteration ?? ""}</td>
     <td>${r.reviewStatus ?? ""}</td>
     <td>${r.opsStatus ?? ""}</td>
     <td>${r.repo}</td>
@@ -171,12 +172,12 @@ app.get("/ui", async (_req, rep) => {
     <div id="intakeStatus"></div>
   </div>
   <table border=1 cellpadding=6>
-    <tr><th>Time</th><th>State</th><th>Phase</th><th>Review</th><th>Ops</th><th>Repo</th><th>Branch</th><th>PR</th><th>Description</th><th>Escalation</th><th>Blocked</th><th>Action</th></tr>
+    <tr><th>Time</th><th>State</th><th>Phase</th><th>Iter</th><th>Review</th><th>Ops</th><th>Repo</th><th>Branch</th><th>PR</th><th>Description</th><th>Escalation</th><th>Blocked</th><th>Action</th></tr>
     ${rows}
   </table>
   <h3 style="margin-top:16px;">Recent Events</h3>
   <table border=1 cellpadding=6>
-    <tr><th>Time</th><th>Run</th><th>Type</th><th>Payload</th></tr>
+    <tr><th>Time</th><th>Run</th><th>Type</th><th>Iteration</th><th>Payload</th></tr>
     ${eventRows}
   </table>
   <script>

@@ -5,10 +5,12 @@ import {
   StateGraph,
 } from "@langchain/langgraph";
 
-import type { RunInput, RunState } from "../state/runState.js";
+import type { RunInput, RunState } from "../state/runState.ts";
 
 type Task = RunState["tasks"][number];
 type Retries = RunState["retries"];
+
+export const DEFAULT_MAX_ITERATIONS = 2;
 
 export const defaultRetries: Retries = {
   plan: 0,
@@ -72,6 +74,12 @@ const OrchestratorState = Annotation.Root({
   logs: Annotation<string[]>({
     reducer: (left, right) => left.concat(right),
     default: () => [],
+  }),
+  iteration: Annotation<number>({
+    default: () => 1,
+  }),
+  maxIterations: Annotation<number>({
+    default: () => DEFAULT_MAX_ITERATIONS,
   }),
 });
 
@@ -279,6 +287,8 @@ type StateSnapshot = Pick<
   | "description"
   | "branch"
   | "repo"
+  | "iteration"
+  | "maxIterations"
 >;
 
 export async function runDevWorkflow(
@@ -291,6 +301,8 @@ export async function runDevWorkflow(
     currentNode?: NodeName;
     retries?: Retries;
     history?: StepLog[];
+    maxIterations?: number;
+    iteration?: number;
     onStep?: (
       step: StepLog,
       state: OrchestratorStateType,
@@ -311,6 +323,8 @@ export async function runDevWorkflow(
     tasks: input.tasks ?? [],
     retries: input.retries ?? defaultRetries,
     logs: [],
+    iteration: input.iteration ?? 1,
+    maxIterations: input.maxIterations ?? DEFAULT_MAX_ITERATIONS,
   };
 
   const steps: StepLog[] = input.history ? [...input.history] : [];
@@ -326,6 +340,8 @@ export async function runDevWorkflow(
     description: state.description,
     branch: state.branch,
     repo: state.repo,
+    iteration: state.iteration,
+    maxIterations: state.maxIterations,
   });
 
   const runNode = async (
@@ -408,21 +424,60 @@ export async function runDevWorkflow(
     ? Math.max(NODE_ORDER.indexOf(input.startNode), 0)
     : 0;
 
-  const orderedNodes: NodeName[] = [
-    "intake",
-    "plan",
-    "dev-execute",
-    "review",
-    "ops",
-    "report",
-  ];
+  const orderedNodes: NodeName[] = NODE_ORDER;
+  let iteration = state.iteration ?? 1;
+  const maxIterations = state.maxIterations ?? DEFAULT_MAX_ITERATIONS;
 
-  for (let i = startIndex; i < orderedNodes.length; i += 1) {
-    const nodeName = orderedNodes[i];
-    await runNode(nodeName, nodeFunctions[nodeName]);
-    if (state.status === "failed" || state.status === "blocked") {
+  while (iteration <= maxIterations) {
+    state.iteration = iteration;
+    const iterationStartIndex =
+      iteration === 1 ? startIndex : orderedNodes.indexOf("plan");
+
+    for (let i = iterationStartIndex; i < orderedNodes.length; i += 1) {
+      const nodeName = orderedNodes[i];
+      await runNode(nodeName, nodeFunctions[nodeName]);
+      if (state.status === "failed" || state.status === "blocked") {
+        break;
+      }
+    }
+
+    if (state.status === "completed") {
       return { state, steps };
     }
+    if (state.status === "blocked") {
+      return { state, steps };
+    }
+    if (state.status === "failed" && iteration < maxIterations) {
+      const replanStep: StepLog = {
+        node: "replan",
+        status: "running",
+        phase: "plan",
+        currentNode: "plan",
+        retries: state.retries,
+        transition: "start",
+        reason: `iteration ${iteration + 1} / ${maxIterations}`,
+        snapshot: snapshot(),
+        timestamp: new Date().toISOString(),
+      };
+      steps.push(replanStep);
+      if (input.onStep) {
+        await input.onStep(replanStep, state, steps);
+      }
+
+      state = {
+        ...state,
+        status: "running",
+        phase: "plan",
+        currentNode: "plan",
+        retries: { ...defaultRetries },
+        tasks: ensureTasks([], state.description),
+        logs: state.logs.concat(`[replan] restarting iteration ${iteration + 1}`),
+      };
+      iteration += 1;
+      continue;
+    }
+
+    return { state, steps };
   }
 
   return { state, steps };

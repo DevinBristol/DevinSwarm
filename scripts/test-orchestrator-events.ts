@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 import assert from "assert";
 import Module from "module";
 import path from "path";
@@ -145,10 +145,12 @@ async function testEventPersistence(): Promise<void> {
   const planComplete = prisma.events.find((e) => e.type === "orchestrator:plan:complete");
   assert(planComplete?.payload?.snapshot?.planSummary, "plan summary should be present in event payload");
   assert(planComplete?.payload?.snapshot?.tasks, "tasks should be present in payload snapshot");
+  assert.strictEqual(planComplete?.payload?.iteration, 1, "iteration should be present in event payload");
 
   const finalEvent = prisma.events[prisma.events.length - 1];
   assert.strictEqual(finalEvent.type, "orchestrator:completed", "final event should be orchestrator:completed");
   assert.strictEqual(finalEvent.status, "completed", "final event should mark completed status");
+  assert.strictEqual(finalEvent.payload.iteration, 1, "final event should carry iteration");
 }
 
 async function testBlockedHistorySkipsRun(): Promise<void> {

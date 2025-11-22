@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 import assert from "assert";
 import { runDevWorkflow, type NodeName } from "../orchestrator/graph/manager.graph.ts";
 

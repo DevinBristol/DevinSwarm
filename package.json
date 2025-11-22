@@ -18,6 +18,7 @@
     "bootstrap:codex": "pwsh -File scripts/codex_bootstrap.ps1",
     "codex:context": "node scripts/codex_context.mjs",
     "check:sot": "node scripts/check-sot-updated.mjs",
+    "ci:install": "npm ci --ignore-scripts --prefer-offline --no-audit --progress=false",
     "test:orchestrator": "node scripts/run-ts-node.js scripts/test-orchestrator-resume.ts && node scripts/run-ts-node.js scripts/test-orchestrator-events.ts",
     "test:orchestrator-events": "node scripts/run-ts-node.js scripts/test-orchestrator-events.ts",
     "test:orchestrator-transitions": "node scripts/run-ts-node.js scripts/test-orchestrator-transitions.ts"
@@ -31,7 +32,6 @@
     "nodemon": "^3.1.11",
     "prisma": "^5.21.1",
     "ts-node": "^10.9.2",
-    "tsx": "^4.19.2",
     "typescript": "^5.6.3"
   },
   "dependencies": {

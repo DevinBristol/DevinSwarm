@@ -1,13 +1,14 @@
 import type { Prisma, PrismaClient, RunState as PrismaRunState } from "@prisma/client";
 
 import {
+  DEFAULT_MAX_ITERATIONS,
   defaultRetries,
   type NodeName,
   runDevWorkflow,
   type StepLog,
   type WorkflowResult,
-} from "./graph/manager.graph.js";
-import type { RunInput } from "./state/runState.js";
+} from "./graph/manager.graph.ts";
+import type { RunInput } from "./state/runState.ts";
 
 export interface OrchestratorRunContext {
   prisma: PrismaClient;
@@ -92,6 +93,9 @@ export async function runOrchestratorForRun(
   const history = Array.isArray(run.statusHistory)
     ? (run.statusHistory as unknown as StepLog[])
     : [];
+  const lastSnapshot = history[history.length - 1]?.snapshot as
+    | (WorkflowResult["state"] & { iteration?: number; maxIterations?: number })
+    | undefined;
 
   const startNode = nextNodeFromHistory(history);
   if (startNode === null) {
@@ -105,6 +109,8 @@ export async function runOrchestratorForRun(
     currentNode?: string | null;
     status?: string;
     retries?: unknown;
+    iteration?: number;
+    maxIterations?: number;
   } = {
     repo: run.repo,
     branch: run.branch ?? "main",
@@ -117,6 +123,8 @@ export async function runOrchestratorForRun(
     currentNode: run.currentNode ?? "intake",
     status: initialStatus,
     retries: (run.retries as any) ?? defaultRetries,
+    iteration: lastSnapshot?.iteration ?? 1,
+    maxIterations: lastSnapshot?.maxIterations ?? DEFAULT_MAX_ITERATIONS,
   };
 
   const persistStep = async (
@@ -168,6 +176,8 @@ export async function runOrchestratorForRun(
             retries: step.retries,
             transition: step.transition,
             timestamp: step.timestamp,
+            iteration: state.iteration ?? 1,
+            maxIterations: state.maxIterations ?? DEFAULT_MAX_ITERATIONS,
             snapshot: step.snapshot,
           },
         },
@@ -190,6 +200,8 @@ export async function runOrchestratorForRun(
     phase: startState.phase ?? "intake",
     status: startState.status ?? "queued",
     history,
+    iteration: startState.iteration ?? 1,
+    maxIterations: startState.maxIterations ?? DEFAULT_MAX_ITERATIONS,
     onStep: persistStep,
   });
 
@@ -206,6 +218,8 @@ export async function runOrchestratorForRun(
         tasks: graphState.state.tasks,
         retries: graphState.state.retries,
         phase: graphState.state.phase,
+        iteration: graphState.state.iteration ?? 1,
+        maxIterations: graphState.state.maxIterations ?? DEFAULT_MAX_ITERATIONS,
       },
     },
   });

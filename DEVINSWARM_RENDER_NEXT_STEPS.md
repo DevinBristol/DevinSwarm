@@ -15,7 +15,7 @@ This file captures how to run DevinSwarm locally and on Render now that the serv
   - Reviewer worker stub at `apps/worker/src/reviewer.ts` (review queue).
   - Ops worker stub at `apps/worker/src/ops.ts` (ops queue).
   - Scout worker at `apps/scout/src/scout.ts`.
-  - Start/test scripts use `scripts/run-ts-node.js` (ts-node transpile-only) to avoid Windows `tsx`/esbuild spawn errors.
+  - Start/test scripts use `scripts/run-ts-node.js` (ts-node transpile-only); `tsx` dependency removed to avoid Windows `child_process.spawn` EPERM.
   - Prisma schema at `prisma/schema.prisma` backed by Postgres.
   - Shared helpers at `packages/shared/*` (policy, GitHub App client, queue).
   - Infra v2 at `infra/docker-compose.dev.yml` and root `render.yaml`.
@@ -56,6 +56,9 @@ npm run start:worker
 # optional: reviewer and ops workers
 npm run start:reviewer-worker
 npm run start:ops-worker
+
+# If installing in CI/Render/Cloud, prefer the script that skips msgpackr prepare:
+npm run ci:install  # npm ci --ignore-scripts --prefer-offline --no-audit --progress=false
 ```
 
 Test locally:

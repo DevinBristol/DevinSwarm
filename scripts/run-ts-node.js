@@ -16,6 +16,21 @@ register({
   },
 });
 
+// Redirect .js imports for TS files that are authored as .ts but imported with .js extension.
+const Module = require("module");
+const originalResolveFilename = Module._resolveFilename;
+Module._resolveFilename = function (request, parent, isMain, options) {
+  if (typeof request === "string" && request.endsWith(".js")) {
+    const tsCandidate = request.replace(/\.js$/, ".ts");
+    try {
+      return originalResolveFilename.call(this, tsCandidate, parent, isMain, options);
+    } catch (_) {
+      // fall through to original request
+    }
+  }
+  return originalResolveFilename.call(this, request, parent, isMain, options);
+};
+
 const [, , target, ...rest] = process.argv;
 if (!target) {
   console.error("Usage: run-ts-node <path-to-ts-file> [args]");

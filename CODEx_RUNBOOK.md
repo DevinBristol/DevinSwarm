@@ -50,11 +50,11 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 - [x] Wire BullMQ queues and Fastify service endpoints (`/intake`, `/runs`, `/runs/:id/unblock`, `/ui`).
 - [x] Scaffold dev/reviewer/ops workers with queue handoffs, GitHub App integration, and `ALLOWED_REPOS` guard.
 - [x] HITL policy stub for missing secrets/test failures plus UI unblock endpoint.
-- [ ] Automated tests for orchestrator transitions, retry limits, and HITL/resume flows.
-- [ ] Document the state model and event schema (Prisma + docs) and clarify retry budgets.
+- [x] Automated tests for orchestrator transitions, retry limits, and HITL/resume flows.
+- [x] Document the state model and event schema (Prisma + docs) and clarify retry budgets.
 - [x] Add an integration test that simulates a mid-run crash and verifies resumability from the DB (`npm run test:orchestrator`).
 - [x] Document and script the resume trigger after `awaiting_unblock` (queue kick + state resume).
-- [ ] Capture a fresh local smoke test log for the M1 stack (service + workers + queue + DB).
+- [x] Capture a fresh local smoke test log for the M1 stack (service + workers + queue + DB).
 
 **M2 - Agent Roles & Graph Stabilized**
 - [ ] Harden prompts and role definitions; codify expected inputs/outputs per node.
@@ -79,20 +79,29 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 ## 3. Current Stage & Next Steps
 
 - **Current milestone:** M1 - Orchestrator & State Model (Phase 1).
-- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Tests: `npm run test:orchestrator` (resume + event persistence/HITL checks via `scripts/run-ts-node.js`) and `npm run test:orchestrator-transitions` (node order, retry cap, blocked history). Local smoke run completed (id `0f92821d-ad1c-4566-b31a-bf3f9a86b93d`); latest local test log: `docs/logs/local-smoke-2025-11-21.md`. Render smokes succeeded after reviewer/ops low-heap tuning: `1eaab2fd-5760-4e2d-a798-74e1727c17e3` (PR #19) and `f36544e0-f8cb-4487-8c8a-9e8e3d532bfc` completed review/ops. Older OOM run `64addeb2-46ae-4092-ba6d-d9ed15248568` archived/closed.
-- **Blockers:** GitHub App secrets are present locally/Render. Redis/Postgres must be running. `tsx`/esbuild spawn errors on Windows are bypassed by `scripts/run-ts-node.js` (ts-node transpile-only); npm prints a harmless `npm-prefix` warning after scripts.
+- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Tests: `npm run test:orchestrator` (resume + event persistence/HITL checks via `scripts/run-ts-node.js`) and `npm run test:orchestrator-transitions` (node order, retry caps for plan/dev/review/ops, blocked history) are green. Latest local smoke log: `docs/logs/local-smoke-2025-11-22.md`. Render smokes succeeded after reviewer/ops low-heap tuning: `1eaab2fd-5760-4e2d-a798-74e1727c17e3` (PR #19) and `f36544e0-f8cb-4487-8c8a-9e8e3d532bfc` completed review/ops. Older OOM run `64addeb2-46ae-4092-ba6d-d9ed15248568` archived/closed.
+- **Blockers:** GitHub App secrets are present locally/Render. Redis/Postgres must be running. Windows `tsx`/esbuild EPERM avoided by removing `tsx` dependency and using `scripts/run-ts-node.js` (ts-node transpile-only) for TS entrypoints; npm emits a harmless `npm-prefix` warning after scripts. `msgpackr` `prepare` script fails when lifecycle scripts run; use `npm run ci:install` (`npm ci --ignore-scripts --prefer-offline --no-audit --progress=false`) in Cloud/CI until upstream is patched/pinned.
 - **Active work items:**
-  - [x] Add automated tests for `orchestrator/graph/manager.graph.ts` covering retry caps, status transitions, and event persistence.
-  - [x] Capture a current local smoke test log and link it here and in `SWARM_PING.md`.
-  - [x] Add HITL/event-persistence focused checks (blocked paths, event payload assertions).
-  - [x] Keep orchestrator test scripts (`test:orchestrator`, `test:orchestrator-transitions`) current with graph changes.
-  - [x] Investigate and remediate `tsx`/esbuild spawn failures on Windows so start/test scripts run without the ts-node fallback (current approach: use `scripts/run-ts-node.js` runner).
+  - [ ] Define and encode self-iteration policy (when to replan vs HITL vs fail) in this runbook and in `prompts/manager.md` (plus any worker prompts that consume it).
+  - [ ] Instrument event stream/UI to emit iteration metadata and reasons and surface them in `/ui`.
+  - [ ] Harden manager/dev/reviewer prompts to respect iteration limits and self-iteration policy.
+  - [ ] (Optional) Pin `msgpackr` once upstream publishes a fixed build; current workaround relies on `--ignore-scripts`.
+
+### M1 state model & event schema (reference)
+- **Run status mapping:** Graph statuses map to Prisma `Run.state` (`queued`→queued, `running`→running, `blocked`→awaiting_unblock, `completed`→done, `failed`→failed). `phase` and `currentNode` mirror the last node executed.
+- **Node order & retries:** Node sequence `intake -> plan -> dev-execute -> review -> ops -> report` (escalate node exists in graph). Retry limits: plan=2, dev=2, review=1, ops=1. Defaults start at 0; exceeding a limit emits a `fail` transition with reason `retry limit exceeded for <node>` and stops further nodes.
+- **Tasks:** Auto-seeded in plan if empty (`plan/dev/review/ops` roles). Task statuses transition to `in_progress` per node and to `done` at report.
+- **Persistence:** Each step emits a `StepLog` (start/complete/fail/blocked) stored in `Run.statusHistory` and updates `Run` fields (planSummary, phase/currentNode, tasks, retries, startedAt/completedAt, lastError). `Run.retries`/`Run.tasks`/`Run.statusHistory` are JSON blobs; `Run.state` is Prisma enum.
+- **Events:** Every step also writes an `Event` row with `type=orchestrator:<node>:<transition>`, `node`, `status`, `reason`, and `payload` containing phase, retries, transition, timestamp, and snapshot; a final `orchestrator:completed` event captures terminal snapshot. Events cascade-delete with the run.
+- **Resume logic:** `nextNodeFromHistory` skips blocked/failed histories; otherwise starts after the last `complete` step. Mid-run resumes reuse stored tasks/retries/phase/currentNode and continue from the computed node.
+- **Self-iteration v0:** Default max iterations = 2. Retry-limit failures on plan/dev/review/ops trigger a replan loop (reset retries/tasks, iteration++). Iteration metadata is logged in `statusHistory`/events but is not yet a persisted schema field; caps prevent infinite loops.
 
 ### Next Steps for Codex
 
 Default actions to pick up next:
 - [ ] If desired, lift the OS policy blocking `child_process.spawn` (EPERM) so `tsx`/esbuild can run without the ts-node fallback; current runner works but `npm-prefix` warning remains harmless.
 - [x] Close or archive the old Render OOM run `64addeb2-46ae-4092-ba6d-d9ed15248568` (not rerun). Local smoke recorded (`0f92821d-ad1c-4566-b31a-bf3f9a86b93d`); Render smokes succeeded (`1eaab2fd-5760-4e2d-a798-74e1727c17e3`, PR #19) and (`f36544e0-f8cb-4487-8c8a-9e8e3d532bfc`).
+- [ ] Add a CI/Cloud install rule (`npm ci --ignore-scripts --prefer-offline --no-audit --progress=false`) or pin `msgpackr` to a fixed build so Cloud runs don’t hit the missing `tests/test.js` Rollup error during `prepare`.
 
 ## 4. Repo Map & Documentation Layout
 
