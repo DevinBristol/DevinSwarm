@@ -1,3 +1,9 @@
-Run 1eaab2fd-5760-4e2d-a798-74e1727c17e3
+> **Source of truth is `CODEx_RUNBOOK.md` - this file is a focused view. Do not diverge from the runbook.**
 
-Render smoke test after 512MB tuning
+# Swarm Ping (status snapshot)
+
+- **End Goals:** End Goal 1 in progress; End Goal 2 not started.
+- **Current milestone:** M1 - Orchestrator & State Model. Graph + queues + service + dev/review/ops workers are wired; HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically.
+- **HITL/unblock:** Runs enter `awaiting_unblock` on HITL triggers. Unblock via `POST /runs/:id/unblock` with `x-ui-token` (same token used by `/ui` button); GitHub issue labels/comments hitting `/unblock` also resume.
+- **Smoke tests:** Local smoke run complete: `0f92821d-ad1c-4566-b31a-bf3f9a86b93d` (description: "Smoke test via CLI") completed through report. Render smoke success: `1eaab2fd-5760-4e2d-a798-74e1727c17e3` (review/ops done, PR #19) after low-heap tuning. Older Render smokes `64addeb2-46ae-4092-ba6d-d9ed15248568` / `f36544e0-f8cb-4487-8c8a-9e8e3d532bfc` OOM'd in review; can close or rerun if needed.
+- **More detail:** See `CODEx_RUNBOOK.md` (roadmap, active work items, and milestones).
