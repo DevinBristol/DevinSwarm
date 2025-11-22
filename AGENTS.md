@@ -1,39 +1,37 @@
-# Repository Guidelines
+> **Source of truth is `CODEx_RUNBOOK.md` - this file is a focused view. Do not diverge from the runbook.**
 
-## Project Structure & Module Organization
-DevinSwarm is a Node 20+ TypeScript repo built around the orchestrator-first design in `CODEx_RUNBOOK.md`. Keep graph/state/policy code in `/orchestrator`, HTTP adapters under `/service`, persistence queues inside `/runtime/{queue,store,events}`, and low-level integrations inside `/tools`. Workers (`dev`, `reviewer`, `research`, `ops`, `scout`) live under `/workers/*`, prompts under `/prompts`, and docs under `/docs`. Place UI assets such as `service/public/hitl.html` under `service/public/` and keep `*.spec.ts` files adjacent to their targets.
+# Agent Roles (M1 snapshot)
 
-## Source of Truth & Codex Ritual
-- The single living plan/status doc is `docs/source-of-truth.md` on `main`. Do not create additional plan/checkpoint docs.
-- At the start of every Codex session in this repo, run `npm run bootstrap:codex` (fetch/prune, read SOT vs `origin/main`) and `npm run codex:context` (print SOT, git status/diff, recent events) so Codex is auto-hydrated.
-- Apply plan/decision/scope/status changes directly to `docs/source-of-truth.md` the same session; prepend to Session Log. If working on a branch, rebase the SOT from `main` first and merge it back early.
-- Archived historical docs live under `docs/archive/*.md`; the stubs in `docs/` point to the SOT.
-- Run `npm run check:sot` before pushing; CI runs the same check, and the PR template requires confirming the SOT update.
-- To force a clean sync to `origin/main`, set `CODEX_RESET_TO_ORIGIN_MAIN=1` before `npm run bootstrap:codex` (WARNING: discards local changes).
+This summarizes the current roles while we are in M1 (Orchestrator & State Model). Full definitions, roadmap, and changes live in `CODEx_RUNBOOK.md` sections 2, 3, and 7.
 
-## Build, Test, and Development Commands
-- `npm ci` – sync dependencies for the orchestrator stack.
-- `npm run build` – compile TypeScript via `tsc -p tsconfig.json`.
-- `docker compose -f infra/docker-compose.dev.yml up -d` – start the local Postgres + Redis stack.
-- `npm run start:service` / `npm run start:worker` – run the HTTP service and worker to confirm `intake → plan → assign → report`.
+## Startup orientation (every session)
+- Read `CODEx_RUNBOOK.md`, this file, and `docs/INDEX.md` before acting.
+- Extract: End Goals, `CURRENT_MILESTONE`, `STATUS_SUMMARY`, `BLOCKERS`, `Active work items`, and `Next Steps for Codex`.
+- Map incoming work to the runbook; if it conflicts, update the runbook first.
 
-### Local Dev Dependencies (PC-to-PC Checklist)
-- Node `20.19.0` (honor `.nvmrc`; use `nvm use` or `fnm use` where available).
-- npm `>=10` (run `npm --version` to confirm).
-- Docker Desktop with Compose (`docker compose version` should succeed).
-- A `.env` file copied from `.env.example` and updated with machine-specific secrets (never committed).
-- Local Postgres/Redis via `docker compose -f infra/docker-compose.dev.yml up -d` before running workers or service.
-- After switching machines: run `npm ci` once, then `npm run db:push` to ensure Prisma schema is applied.
+## Doc-sync responsibilities
+- Keep docs in lockstep with behavior: runbook first for scope/status changes, then `AGENTS.md`, `SWARM_PING.md`, `DEVINSWARM_RENDER_NEXT_STEPS.md`, and `docs/plans/devinswarm-docs-plan.md` as needed.
+- Maintain the SOT banner on focused docs; avoid creating separate plans outside the runbook.
+- Check for an ExecPlan under `docs/plans/` for non-trivial work; create/update it when missing.
+- When adding non-trivial features or refactors, ensure the runbook and prompts/role definitions reflect the change in the same commit.
 
-## Coding Style & Naming Conventions
-Follow `.editorconfig`: 2-space indent, LF, newline at EOF. Use strict TypeScript, ES modules, alphabetized imports, and `async` functions returning typed `Promise`s. Keep directories/file names `kebab-case`, exported types `PascalCase`, functions/vars `camelCase`, and env vars `SCREAMING_SNAKE_CASE`. Validate inputs with `zod` in `/orchestrator/state`, share constants through `/runtime/store`, and log via `winston`.
+## Current roles
+- **Manager / orchestrator**: `orchestrator/graph/manager.graph.ts` drives `intake -> plan -> dev -> review -> ops -> report` with retries; `orchestrator/index.ts` persists runs and events.
+- **Dev worker**: `apps/worker/src/worker.ts` clones via GitHub App, enforces `ALLOWED_REPOS`, scaffolds a branch/PR, emits events, and hands off to the reviewer queue. Honors HITL blocks when secrets are missing or errors repeat.
+- **Reviewer worker**: `apps/worker/src/reviewer.ts` runs `REVIEWER_COMMAND` (default `npm run build`), sets commit status (`swarm/review` by default), posts PR comments, and enqueues ops. Blocks on failures and HITL triggers.
+- **Ops worker**: `apps/worker/src/ops.ts` runs `OPS_COMMAND`, sets commit status (`swarm/ops`), and marks runs done (manual merge for now). Blocks on failures and HITL triggers.
+- **Scout**: `apps/scout/src/scout.ts` opens an improvement issue (stub; schedule/cron to be added in later milestones).
+- **Research / additional agents**: reserved for later milestones (see roadmap).
 
-## Testing Guidelines
-Name tests after the node or worker under test (`manager.graph.spec.ts`, `queue.spec.ts`). Prefer colocated unit tests plus lightweight integration runs that exercise the complete flow by running `npm run build && npm run start:service` alongside `npm run start:worker`, capturing logs that show a dummy task traversing all four states. Cover enqueue/reservation logic, HITL escalation triggers, and worker side effects; mock GitHub/filesystem calls but keep Redis/Postgres real for queue semantics.
+## Prompts and config
+- Prompts: `prompts/manager.md` and `prompts/workers/dev.md` (stubs to expand in M2).
+- Env/config: GitHub App fields (`GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`), `ALLOWED_REPOS`, `AUTO_MERGE_LOW_RISK`, `REVIEWER_COMMAND`, `OPS_COMMAND`, `UI_TOKEN`. Workers log env presence but never secrets.
 
-## Commit & Pull Request Guidelines
-Write imperative conventional commits such as `feat(orchestrator): stub assign node`. Every PR must include the runbook sections (**Goals**, **Plan**, **Artifacts**, **How to Unblock**) and note any required secrets or approvals via the escalation template before reallocating workers. Attach logs, screenshots, or traces that show new behavior, and block merging until `npm run build` (and future lint/tests) succeed.
+## HITL and reservations
+- HITL policy is in `orchestrator/policies/hitl.ts` (missing secrets, destructive changes, repeated test failures, ambiguous spec). Runs enter `awaiting_unblock`; unblock via `POST /runs/:id/unblock` with `x-ui-token`.
+- Resume trigger after unblock is still manual/pending (see runbook active work items).
 
-## Security & Configuration Tips
-Never commit `.env`; update `.env.example` whenever adding `OPENAI_API_KEY`, `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `REDIS_URL`, `DATABASE_URL` or `CHATKIT_*`. Load variables through `dotenv` solely in entry points and pass them explicitly elsewhere. Document scopes when requesting GitHub or ChatKit secrets, store them in Actions → Secrets, and avoid logging secret material—emit token names or short hashes instead.
-
+## Pointers
+- Roadmap, milestone status, and active work items: `CODEx_RUNBOOK.md`.
+- Doc index and doc plan: `docs/INDEX.md`, `docs/plans/devinswarm-docs-plan.md`.
+- Render/local deployment quick steps: `DEVINSWARM_RENDER_NEXT_STEPS.md`.

@@ -1,6 +1,5 @@
-# Archived: Design Notes
+> **Source of truth is `CODEx_RUNBOOK.md` - this file is a focused view. Do not diverge from the runbook.**
 
-This document has been archived to avoid multiple sources of truth. The active plan and status live in `docs/source-of-truth.md` on `main`.
+# Archived - see CODEx_RUNBOOK.md
 
-- Historical copy: `docs/archive/design.md`
-- Active plan/status: `docs/source-of-truth.md`
+This document has been superseded by `CODEx_RUNBOOK.md` and is kept only for historical reference.

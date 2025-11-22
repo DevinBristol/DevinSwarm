@@ -1,6 +1,5 @@
-# Archived: Phase 1 Follow-ups
+> **Source of truth is `CODEx_RUNBOOK.md` - this file is a focused view. Do not diverge from the runbook.**
 
-This checkpoint has been archived to avoid multiple sources of truth. The active plan and status live in `docs/source-of-truth.md` on `main`.
+# Archived - see CODEx_RUNBOOK.md
 
-- Historical copy: `docs/archive/phase-1-followups.md`
-- Active plan/status: `docs/source-of-truth.md`
+This document has been superseded by `CODEx_RUNBOOK.md` and is kept only for historical reference.

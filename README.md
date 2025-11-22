@@ -1,3 +1,11 @@
+
+## Project Runbook (Source of Truth)
+
+The canonical source of truth for goals, roadmap, milestones, and current status is [`CODEx_RUNBOOK.md`](./CODEx_RUNBOOK.md).
+
+Start there (for both humans and AI agents) to understand what DevinSwarm is doing and what to work on next.
+
+
 # DevinSwarm
 
 DevinSwarm is a Node 20+ TypeScript orchestrator built around LangGraph JS. It uses a Redis-backed queue and dedicated workers to run 24/7 and handle multiple issues in parallel, targeting an intake -> plan -> dev-execute -> review -> ops -> report/escalate flow.

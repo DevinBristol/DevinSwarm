@@ -1,792 +1,563 @@
-# DevinSwarm – Codex Bootstrap Script
-**Audience:** Codex running in IntelliJ with `danger` / `workspace-write` enabled.  
-**Goal:** Bring the DevinSwarm repo to a working baseline:
-- Clean repo (no node_modules/.env/etc in git)
-- Add Node/TypeScript toolchain, Postgres (Prisma), Redis queue (BullMQ)
-- Add web service (`/health`, `/intake`, `/runs`, `/ui`)
-- Add background worker (Dev worker) and Scout worker
-- Wire Render (web + worker + Key Value + Postgres) via root `render.yaml`
-- Enable GitHub App auth for direct repo read/write
-- Default to OpenAI
-- Enforce daily budget + low‑risk auto‑merge scaffold
 
-You have full write access to the project root and may create folders/files as needed.
+> **Source of truth is `CODEx_RUNBOOK.md` - this file is a focused view. Do not diverge from the runbook.**
 
----
+<!-- devinswarm_codex_bootstrap.md -->
 
-## 0. Assumptions and environment
+# DevinSwarm Codex Contract & Bootstrap (v2 – Source-of-Truth Merge)
 
-- The project root is the DevinSwarm repo.
-- Git is already initialized and remote is set.
-- You may create/modify files and run Node/PNPM/NPM commands as needed.
-- Do **NOT** create or commit any real secrets; only use `.env.example` values.
+You are **Codex**, the development agent for the repository `DevinBristol/DevinSwarm`.
 
-When in doubt, prefer small, focused commits with clear messages.
+Your job is to:
 
----
+- Keep the **plan, docs, code, and runtime behavior** in sync.
+- Use a **single source-of-truth runbook** for all context, scope, goals, and next steps.
+- Continuously update docs in Git as you change the codebase.
+- Preserve and merge the existing **`docs/source-of-truth.md`** and **`CODEx_RUNBOOK.md`** into one canonical runbook.
+- Prepare DevinSwarm to become a **self-iterating AI swarm with human-in-the-loop (HITL)**, and eventually **multi-language / multi-platform** (starting with Salesforce).
 
-## 1. Repo hygiene and Node toolchain
+This file tells you **how to behave** and **what to change in the repo** so that:
 
-1.1 **Create or update `.gitignore` in the repo root** with at least this content:
-
-```gitignore
-# Node/build
-node_modules/
-dist/
-
-# Local env & DB
-.env
-*.db
-
-# IDE
-.idea/
-*.iml
-.DS_Store
-```
-
-1.2 **Create `.nvmrc`** in the repo root with:
-
-```text
-20.19.0
-```
-
-1.3 **Update `package.json`** (create if it does not exist; otherwise merge) so that at minimum it includes:
-
-```jsonc
-{
-  "name": "devinswarm",
-  "private": true,
-  "type": "commonjs",
-  "scripts": {
-    "build": "tsc --noEmit",
-    "start:service": "tsx apps/service/src/server.ts",
-    "start:worker": "tsx apps/worker/src/worker.ts",
-    "start:scout": "tsx apps/scout/src/scout.ts",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "lint": "echo 'add eslint later'"
-  },
-  "engines": {
-    "node": ">=20 <21",
-    "npm": ">=10"
-  },
-  "dependencies": {
-    "@octokit/auth-app": "^7.0.0",
-    "@octokit/core": "^6.1.2",
-    "@prisma/client": "^5.21.1",
-    "bullmq": "^5.7.7",
-    "fastify": "^4.28.1",
-    "fastify-healthcheck": "^4.4.0",
-    "ioredis": "^5.3.2",
-    "openai": "^4.77.0",
-    "pino": "^9.5.0",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@types/node": "^22.9.0",
-    "@types/pino": "^9.0.4",
-    "prisma": "^5.21.1",
-    "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
-  }
-}
-```
-
-If a `package.json` already exists, merge these keys, preserving any existing scripts that are still needed.
-
-1.4 **Create `tsconfig.json`** in the repo root if it does not exist:
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2021",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
-    "esModuleInterop": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "outDir": "dist",
-    "resolveJsonModule": true
-  },
-  "include": ["apps/**/*", "packages/**/*", "prisma/**/*"]
-}
-```
-
-1.5 **Create `.env.example`** in the repo root:
-
-```env
-# LLM + budgets
-OPENAI_API_KEY=
-DAILY_BUDGET_USD=75
-
-# GitHub App (for repo read/write)
-GITHUB_APP_ID=
-GITHUB_INSTALLATION_ID=
-GITHUB_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-GITHUB_WEBHOOK_SECRET=
-
-# Datastores (local dev via Docker; Render injects its own)
-REDIS_URL=redis://localhost:6379
-DATABASE_URL=postgresql://devinswarm:devinswarm@localhost:5432/devinswarm?schema=public
-
-# Policy
-AUTO_MERGE_LOW_RISK=true
-ALLOWED_REPOS=DevinBristol/DevinSwarm
-
-# Minimal UI auth
-UI_TOKEN=change-me
-```
-
-Do **not** commit a real `.env`. Only `.env.example` should be tracked.
-
-Commit these changes with:
-
-> `chore: base Node toolchain and env template`
+1. Document / Context / Scope / Plan / Goal drift is eliminated for both humans and Codex.
+2. Document updates are automatic, Git-tracked, and happen in the **same commits/PRs** as code changes.
+3. All directions roll up into a **single source-of-truth document** (`CODEx_RUNBOOK.md`) that **absorbs** the previous `docs/source-of-truth.md`.
+4. Refactoring and context juggling are minimized.
+5. You can **bring yourself up to speed automatically** on the current context, stage, and next steps without human onboarding.
+6. Docs stay organized, discoverable, and readable for both humans and AI agents.
+7. The project is clearly oriented around two End Goals:
+   - **End Goal 1** – DevinSwarm as a self-iterating AI agent swarm with HITL.
+   - **End Goal 2** – DevinSwarm can develop solutions across multiple languages & platforms, starting with **Salesforce**.
+8. Documentation explicitly encodes **End Goals → Roadmap → Milestones → Extremely detailed check-off steps**.
 
 ---
 
-## 2. Local Docker for Redis and Postgres
+## 0. Immediate Setup – Source-of-Truth Merge (Do This First)
 
-2.1 **Create `infra/docker-compose.dev.yml`**:
+When you are first given this contract in the `DevinSwarm` repo, perform these actions in order:
 
-```yaml
-version: '3.8'
-services:
-  redis:
-    image: redis:7
-    ports: ["6379:6379"]
-  postgres:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: swarm
-      POSTGRES_PASSWORD: swarm
-      POSTGRES_DB: swarm
-    ports: ["5432:5432"]
-```
+1. **Confirm core files exist** at the repo root:
+   - `CODEx_RUNBOOK.md` (**canonical runbook / source of truth**)
+   - `README.md`
+   - `AGENTS.md`
+   - `DEVINSWARM_RENDER_NEXT_STEPS.md` (Render deployment & smoke tests, if present)
+   - `SWARM_PING.md` (status / health / sanity-check doc, if present)
+   - `devinswarm_codex_bootstrap.md` (this contract)
+   - `docs/source-of-truth.md` (legacy/original source-of-truth, if present)
 
-Commit:
+2. **Merge `docs/source-of-truth.md` into `CODEx_RUNBOOK.md`**:
 
-> `chore: add dev docker-compose for Redis and Postgres`
+   1. Open both:
+      - `docs/source-of-truth.md` (legacy, human-written SOT)
+      - `CODEx_RUNBOOK.md` (existing Codex runbook or operator script)
+   2. Apply the canonical structure in **§2. Canonical Source-of-Truth Runbook Layout** to `CODEx_RUNBOOK.md`:
+      - Reorganize its content under the prescribed headings.
+      - **Integrate all relevant content from `docs/source-of-truth.md`** into the appropriate sections:
+        - High-level goals and vision → `## 1. End Goals`
+        - Roadmap, phases, “v2 plan”, 12-point plans, etc. → `## 2. Roadmap & Milestones` and/or a dedicated “Appendix A – Historical Plans”.
+        - Current work, status, and TODOs → `## 3. Current Stage & Next Steps`.
+        - Repo layout notes → `## 4. Repo Map & Documentation Layout`.
+   3. **Never throw away information**:
+      - If something from either file does not yet have a clear place, add a section such as `## 8. Historical Context & Notes` and park it there, tagged with its origin.
+      - Deduplicate conflicting or repeated statements by choosing a single, clear wording in the canonical section and mentioning alternatives only as historical notes.
+   4. As you merge, ensure the resulting `CODEx_RUNBOOK.md`:
+      - Has **one unified description** of End Goals, roadmap, milestones, and current status.
+      - Uses **checkboxes** for milestones and sub-steps wherever possible.
+      - Is written to be readable by both humans and AI agents.
 
----
+3. **Downgrade `docs/source-of-truth.md` to a thin pointer**:
 
-## 3. Prisma schema and client
+   After the merge is complete:
 
-3.1 **Create Prisma schema at `prisma/schema.prisma`** with:
+   - Replace the contents of `docs/source-of-truth.md` with:
 
-```prisma
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+     ```markdown
+     # DevinSwarm – Legacy Source of Truth (Pointer Only)
 
-model Run {
-  id            String   @id @default(uuid())
-  repo          String
-  title         String?
-  description   String?
-  state         RunState @default(queued)
-  priority      Int      @default(0)
-  budgetUsd     Float    @default(5)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  blockedReason String?
-  labels        String[] @default([])
-  events        Event[]
-}
+     > **This file is no longer the canonical source of truth.**  
+     > The current, authoritative runbook is [`CODEx_RUNBOOK.md`](../CODEx_RUNBOOK.md).
 
-model Event {
-  id        String   @id @default(uuid())
-  runId     String
-  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
-  type      String
-  payload   Json
-  createdAt DateTime @default(now())
-}
+     All active goals, roadmap, milestones, and next steps now live in `CODEx_RUNBOOK.md`.
+     ```
 
-enum RunState {
-  queued
-  running
-  blocked
-  awaiting_unblock
-  done
-  failed
-}
-```
+   - Do **not** maintain a separate plan here. It is only a pointer and a historical reference.
 
-3.2 **Ensure Prisma client is generated via scripts**
+4. **Normalize `CODEx_RUNBOOK.md` to the canonical layout**:
 
-The `package.json` already has:
+   - Ensure it follows all headings and structure described in **§2**.
+   - Preserve any existing v2 operator instructions or 12-point plans by:
+     - Integrating them into milestones and checklists **or**
+     - Moving them into an **Appendix** referenced from the roadmap.
 
-- `db:generate`: `prisma generate`
-- `db:push`: `prisma db push`
+5. **Update `README.md`** so that it clearly states:
 
-No additional changes required in this step.
+   - `CODEx_RUNBOOK.md` is the **single source of truth** for project goals, roadmap, current stage, and next steps.
+   - Humans and Codex agents should **start there** to understand context and what to do next.
+   - `docs/source-of-truth.md` is now a **legacy pointer** only.
 
-Commit:
+6. **Update `AGENTS.md`** so that:
 
-> `feat(runtime): add Prisma schema for runs and events`
+   - It describes the **current and planned** agent roles (manager/orchestrator, dev worker, reviewer, research, ops, scout, etc.).
+   - It references `CODEx_RUNBOOK.md` for:
+     - The definition of each agent’s role at each milestone.
+     - The current set of prompts/configs that should be used.
 
----
+7. **Update `DEVINSWARM_RENDER_NEXT_STEPS.md`** so that:
 
-## 4. Shared code: policy, GitHub, and queues
+   - It is a **checklist view derived from the runbook**, not a separate plan.
+   - At the very top, add:
 
-4.1 **Create folder `packages/shared`** if it doesn’t exist.
+     > **Source of truth is `CODEx_RUNBOOK.md`.**  
+     > This file is a focused view (Render deployment & smoke tests). Do not diverge from the runbook.
 
-4.2 **Create `packages/shared/policy.ts`**:
+8. **Update `SWARM_PING.md`** so that:
 
-```ts
-export const DAILY_BUDGET_USD = Number(process.env.DAILY_BUDGET_USD ?? 75);
-export const AUTO_MERGE_LOW_RISK = (process.env.AUTO_MERGE_LOW_RISK ?? "true") === "true";
-export const ALLOWED_REPOS = new Set(
-  (process.env.ALLOWED_REPOS ?? "")
-    .split(",")
-    .map(s => s.trim())
-    .filter(Boolean)
-);
+   - It is a short, human-readable **status snapshot** containing:
+     - Current End Goal progress (End Goal 1 & End Goal 2).
+     - Current milestone (M1–M5).
+     - Last successful smoke test (local and/or Render).
+   - It explicitly points to `CODEx_RUNBOOK.md` for detailed context:
 
-// naive file-based low-risk heuristic; refine later
-export function isLowRiskChangedFiles(files: string[]) {
-  const risky = [
-    /^src\/security\//,
-    /^infra\//,
-    /^database\//,
-    /package\.json$/,
-    /render\.yaml$/
-  ];
-  if (files.length > 50) return false;
-  return files.every(f => !risky.some(rx => rx.test(f)));
-}
-```
+     > For full roadmap, status, and next steps, see `CODEx_RUNBOOK.md`.
 
-4.3 **Create `packages/shared/github.ts`**:
-
-```ts
-import { Octokit } from "@octokit/core";
-import { createAppAuth } from "@octokit/auth-app";
-
-export function ghInstallClient() {
-  const appId = process.env.GITHUB_APP_ID!;
-  const installationId = process.env.GITHUB_INSTALLATION_ID!;
-  const privateKey = process.env.GITHUB_PRIVATE_KEY!.replace(/\n/g, "\n").replace(/\\n/g, "\n");
-
-  return new Octokit({
-    authStrategy: createAppAuth,
-    auth: { appId, privateKey, installationId: Number(installationId) }
-  });
-}
-```
-
-4.4 **Create `packages/shared/queue.ts`**:
-
-```ts
-import { Queue, Worker, JobsOptions, QueueEvents } from "bullmq";
-import IORedis from "ioredis";
-
-const connection = new IORedis(process.env.REDIS_URL!);
-
-export const devQueue = new Queue("dev", { connection });
-export const reviewQueue = new Queue("review", { connection });
-export const scoutQueue = new Queue("scout", { connection });
-
-export const defaultJobOpts: JobsOptions = {
-  removeOnComplete: 1000,
-  removeOnFail: 1000,
-  attempts: 2
-};
-
-export function makeWorker(name: string, processor: any, concurrency = 2) {
-  return new Worker(name, processor, { connection, concurrency });
-}
-
-export function events(name: string) {
-  return new QueueEvents(name, { connection });
-}
-```
-
-Commit:
-
-> `feat(shared): add policy, GitHub App client, and BullMQ helpers`
+Only when these are in place do you proceed to implementing new features or code-level changes.
 
 ---
 
-## 5. Web service: health, intake, runs, UI, and GitHub webhooks
+## 1. Invariants – Rules You Must Always Obey
 
-Create folder structure: `apps/service/src` if it doesn’t exist.
+These rules exist specifically to eliminate drift, reduce refactoring, and enable automatic handling.
 
-5.1 **Create `apps/service/src/webhooks.ts`**:
+1. **Single Source of Truth**
 
-```ts
-import { FastifyInstance } from "fastify";
-import { PrismaClient } from "@prisma/client";
-import crypto from "crypto";
+   - `CODEx_RUNBOOK.md` is the **only canonical place** for:
+     - End goals and definitions of done.
+     - Roadmap and milestones (with checklists).
+     - Current stage and next steps.
+     - Canonical description of agent roles and responsibilities.
+     - Platform (Salesforce & others) abstractions and integration approach.
+   - All other docs **must reference** the runbook and must not independently redefine goals or stages.
+   - `docs/source-of-truth.md` is a **pointer**, not an independent plan.
 
-const prisma = new PrismaClient();
+2. **Doc-first, then code**
 
-export function registerWebhook(app: FastifyInstance) {
-  app.post("/webhooks/github", async (req, rep) => {
-    const secret = process.env.GITHUB_WEBHOOK_SECRET;
-    if (secret) {
-      const sig = req.headers["x-hub-signature-256"] as string || "";
-      const raw = (req as any).rawBody as string;
-      const hmac = "sha256=" + crypto.createHmac("sha256", secret).update(raw).digest("hex");
-      if (sig !== hmac) return rep.code(401).send({ error: "bad signature" });
-    }
+   For any non-trivial change to architecture, workflows, or capabilities:
 
-    const event = req.headers["x-github-event"];
-    const body: any = req.body ?? {};
+   1. Update the **runbook** first to reflect the new plan or design.
+   2. Then update the code, prompts, infra, and other docs to match.
 
-    if (event === "issues") {
-      const labels: string[] = (body.issue?.labels ?? []).map((l: any) => l.name);
-      const title = body.issue?.title ?? "";
-      const unblock = labels.includes("unblocked") || /\/unblock/i.test(body.comment?.body ?? "");
-      const runIdMatch = title.match(/run\s*([0-9a-fA-F-]{6,})/i);
-      const runId = runIdMatch?.[1];
-      if (unblock && runId) {
-        await prisma.run.update({
-          where: { id: runId },
-          data: { state: "running", blockedReason: null }
-        });
-      }
-    }
+   If you see divergence between docs and code, you **fix the runbook first**, then propagate.
 
-    return { ok: true };
-  });
-}
-```
+3. **Docs & code must change together (automatic handling)**
 
-5.2 **Create `apps/service/src/server.ts`**:
+   - If you change behavior, APIs, agent roles, platform behavior, or deployment flow, you **must**:
+     - Update `CODEx_RUNBOOK.md` and any affected view-docs (`AGENTS.md`, `DEVINSWARM_RENDER_NEXT_STEPS.md`, `SWARM_PING.md`, `docs/*`).
+     - Stage and commit those doc changes **in the same commit/PR** as the code change.
+   - If you discover drift (code & docs disagree), you are authorized to:
+     - Create a **“doc-sync”** change that updates only docs and/or small code tweaks to realign behavior with the runbook.
 
-```ts
-import Fastify from "fastify";
-import health from "fastify-healthcheck";
-import { PrismaClient } from "@prisma/client";
-import { devQueue } from "../../../packages/shared/queue";
-import { registerWebhook } from "./webhooks";
-import { randomUUID } from "crypto";
+4. **No silent forks of context**
 
-const prisma = new PrismaClient();
-const app = Fastify({ logger: true });
+   - Do not introduce new “plan” or “goals” sections in random files.
+   - Any new file that expresses direction (e.g. `docs/salesforce_path.md`) must:
+     - Declare at the top:
 
-// Raw-body parser so GitHub HMAC can be verified in webhooks
-app.addContentTypeParser("application/json", { parseAs: "string" }, function (req, body, done) {
-  try {
-    (req as any).rawBody = body;
-    done(null, JSON.parse(body as string));
-  } catch (err) {
-    done(err as Error, undefined);
-  }
-});
+       > **Source of truth is `CODEx_RUNBOOK.md` – this file is a focused view. Do not diverge from the runbook.**
 
-app.register(health);
-registerWebhook(app);
+     - Link the relevant section of the runbook.
 
-app.get("/health", async () => ({ ok: true }));
+5. **Self-onboarding on load (no human calls needed)**
 
-app.post("/intake", async (req, rep) => {
-  const body: any = req.body ?? {};
-  const { repo, description, title, budgetUsd } = body;
-  if (!repo) return rep.code(400).send({ error: "repo required" });
+   Every time you are started in this repo, you must:
 
-  const run = await prisma.run.create({
-    data: {
-      id: randomUUID(),
-      repo,
-      description,
-      title,
-      state: "queued",
-      budgetUsd: Number(budgetUsd ?? 5)
-    }
-  });
+   - Load & skim `CODEx_RUNBOOK.md`.
+   - Extract:
+     - The current End Goals (1 & 2).
+     - The current milestone (M1–M5).
+     - The current “Active Work Items”.
+   - Use those to drive your behavior; **do not invent your own plan** from scratch.
 
-  await devQueue.add("dev.start", { runId: run.id });
+6. **Keep refactoring minimal & purposeful**
 
-  return run;
-});
+   - Prefer **evolving** existing docs/code in place rather than creating new parallel structures.
+   - When you must refactor:
+     - Update runbook indexes and “repo map”.
+     - Ensure old file paths are either updated or clearly marked as deprecated/pointers.
 
-app.get("/runs", async () => {
-  return prisma.run.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
-});
+7. **Everything has a home**
 
-app.get("/runs/:id", async (req, rep) => {
-  const id = (req.params as any).id;
-  const run = await prisma.run.findUnique({
-    where: { id },
-    include: { events: true }
-  });
-  if (!run) return rep.code(404).send({ error: "not found" });
-  return run;
-});
-
-app.post("/runs/:id/unblock", async (req, rep) => {
-  const token = (req.headers["x-ui-token"] ?? "") as string;
-  if (token !== process.env.UI_TOKEN) return rep.code(401).send({ error: "unauthorized" });
-  const id = (req.params as any).id;
-  await prisma.run.update({
-    where: { id },
-    data: { state: "running", blockedReason: null }
-  });
-  return { ok: true };
-});
-
-app.get("/ui", async (_req, rep) => {
-  const runs = await prisma.run.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 30
-  });
-  const rows = runs
-    .map(
-      (r) => `
-  <tr>
-    <td>${r.createdAt.toISOString()}</td>
-    <td>${r.state}</td>
-    <td>${r.repo}</td>
-    <td>${r.description ?? ""}</td>
-    <td>${r.blockedReason ?? ""}</td>
-    <td>${
-      r.state === "awaiting_unblock"
-        ? `<button onclick="unblock('${r.id}')">Unblock</button>`
-        : ""
-    }</td>
-  </tr>`
-    )
-    .join("");
-
-  const html = `<!doctype html><meta name=viewport content="width=device-width, initial-scale=1">
-  <h2>DevinSwarm Runs</h2>
-  <table border=1 cellpadding=6>
-    <tr><th>Time</th><th>State</th><th>Repo</th><th>Description</th><th>Blocked</th><th>Action</th></tr>
-    ${rows}
-  </table>
-  <script>
-    async function unblock(id) {
-      const resp = await fetch('/runs/' + id + '/unblock', {
-        method: 'POST',
-        headers: { 'x-ui-token': '${process.env.UI_TOKEN ?? "change-me"}' }
-      });
-      if (resp.ok) location.reload(); else alert('Failed');
-    }
-  </script>`;
-
-  return rep.type("text/html").send(html);
-});
-
-app.listen({ port: Number(process.env.PORT ?? 3000), host: "0.0.0.0" });
-```
-
-Commit:
-
-> `feat(service): add health, intake, runs API, GitHub webhook, and minimal UI`
+   - Any new concept (agent, platform, workflow, policy) must have a **canonical home section** in `CODEx_RUNBOOK.md`.
+   - If you cannot find a suitable place, create a new subsection under the appropriate top-level heading (End Goals, Roadmap, Platforms, etc.).
 
 ---
 
-## 6. Dev worker and Scout worker
+## 2. Canonical Source-of-Truth Runbook Layout (`CODEx_RUNBOOK.md`)
 
-Create folder structure: `apps/worker/src` and `apps/scout/src` if they don’t exist.
+You must enforce the following structure (headings) in `CODEx_RUNBOOK.md`.
 
-6.1 **Create `apps/worker/src/worker.ts`**:
+When you first apply this contract, restructure `CODEx_RUNBOOK.md` to follow:
 
-```ts
-import { makeWorker } from "../../../packages/shared/queue";
-import { PrismaClient } from "@prisma/client";
-import { ghInstallClient } from "../../../packages/shared/github";
-import { ALLOWED_REPOS, AUTO_MERGE_LOW_RISK } from "../../../packages/shared/policy";
+```markdown
+# DevinSwarm – CODEx Runbook (Source of Truth)
 
-const prisma = new PrismaClient();
-const gh = ghInstallClient();
+> This runbook is the canonical, up-to-date description of:
+> - Project goals and roadmap
+> - Current stage and next steps
+> - Agent roles and responsibilities
+> - Documentation layout and invariants
+> - Supported platforms (Salesforce first) and future platform strategy
+>
+> All other docs and scripts are subordinate to this file.
 
-// Dev worker v0: simple end-to-end PR to prove wiring.
-makeWorker(
-  "dev",
-  async (job) => {
-    const { runId } = job.data as { runId: string };
-    const run = await prisma.run.findUnique({ where: { id: runId } });
-    if (!run) return;
+## 1. End Goals
 
-    if (!ALLOWED_REPOS.has(run.repo)) {
-      await prisma.run.update({
-        where: { id: runId },
-        data: { state: "failed", blockedReason: "Repo not allowed" }
-      });
-      throw new Error(`Repo not allowed: ${run.repo}`);
-    }
+### 1.1 End Goal 1 – Self-Iterating DevinSwarm with HITL
 
-    await prisma.run.update({
-      where: { id: runId },
-      data: { state: "running" }
-    });
+[High-level description + Definition of Done checklist]
 
-    try {
-      const [owner, repo] = run.repo.split("/");
-      const repoInfo = await gh.request("GET /repos/{owner}/{repo}", { owner, repo });
-      const defaultBranch = (repoInfo.data as any).default_branch;
+### 1.2 End Goal 2 – Multi-Language / Multi-Platform Solutions (Salesforce First)
 
-      const baseRef = await gh.request("GET /repos/{owner}/{repo}/git/ref/{ref}", {
-        owner,
-        repo,
-        ref: `heads/${defaultBranch}`
-      });
-      const baseSha = (baseRef.data as any).object.sha;
+[High-level description + Definition of Done checklist]
 
-      const branch = `swarm/run-${runId.slice(0, 8)}`;
-      await gh
-        .request("POST /repos/{owner}/{repo}/git/refs", {
-          owner,
-          repo,
-          ref: `refs/heads/${branch}`,
-          sha: baseSha
-        })
-        .catch(() => {});
+## 2. Roadmap & Milestones
 
-      const tree = await gh.request("POST /repos/{owner}/{repo}/git/trees", {
-        owner,
-        repo,
-        base_tree: baseSha,
-        tree: [
-          {
-            path: "SWARM_PING.md",
-            mode: "100644",
-            type: "blob",
-            content: `Run ${runId}\n\n${run.description ?? ""}\n`
-          }
-        ]
-      });
+[Ordered milestones M1–M5 with detailed checklists and sub-steps]
 
-      const commit = await gh.request("POST /repos/{owner}/{repo}/git/commits", {
-        owner,
-        repo,
-        message: `chore(swarm): scaffold for run ${runId}`,
-        tree: (tree.data as any).sha,
-        parents: [baseSha]
-      });
+## 3. Current Stage & Next Steps
 
-      await gh.request("PATCH /repos/{owner}/{repo}/git/refs/{ref}", {
-        owner,
-        repo,
-        ref: `heads/${branch}`,
-        sha: (commit.data as any).sha,
-        force: true
-      });
+[Current milestone, status summary, blockers, and a short, prioritized Active Work Items list]
 
-      const pr = await gh.request("POST /repos/{owner}/{repo}/pulls", {
-        owner,
-        repo,
-        title: `Swarm: ${run.title ?? run.description ?? runId}`,
-        head: branch,
-        base: defaultBranch,
-        body: `Automated PR by DevinSwarm (run ${runId}).`
-      });
+## 4. Repo Map & Documentation Layout
 
-      if (AUTO_MERGE_LOW_RISK) {
-        try {
-          await gh.request("PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge", {
-            owner,
-            repo,
-            pull_number: (pr.data as any).number,
-            merge_method: "squash"
-          });
-        } catch {
-          // okay if branch protection blocks auto-merge
-        }
-      }
+[Overview of folders, key docs, and pointers to focused views]
 
-      await prisma.run.update({
-        where: { id: runId },
-        data: { state: "done" }
-      });
-    } catch (err: any) {
-      await prisma.run.update({
-        where: { id: runId },
-        data: {
-          state: "awaiting_unblock",
-          blockedReason: String(err?.message ?? err)
-        }
-      });
-    }
-  },
-  2 // concurrency
-);
-```
+## 5. Codex Startup Routine (Self-Onboarding)
 
-6.2 **Create `apps/scout/src/scout.ts`**:
+[Exact steps Codex must run on load to get up to speed]
 
-```ts
-import { makeWorker } from "../../../packages/shared/queue";
-import { ghInstallClient } from "../../../packages/shared/github";
+## 6. Documentation Update Rules
 
-const gh = ghInstallClient();
+[Rules for keeping runbook + view-docs updated and in sync]
 
-// v0 scout: improvement suggestion issue
-makeWorker("scout", async () => {
-  const [owner, repo] = (process.env.SCOUT_REPO ?? "DevinBristol/DevinSwarm").split("/");
-  await gh.request("POST /repos/{owner}/{repo}/issues", {
-    owner,
-    repo,
-    title: "Scout: framework improvement sweep",
-    body: "Propose improvements to agent prompts, risk scoring, and CI integration based on recent runs."
-  });
-}, 1);
-```
+## 7. Encoding End Goal 1 (Self-Iterating Swarm with HITL)
 
-Commit:
+[How orchestrator, agents, HITL, and self-iteration map into code and docs]
 
-> `feat(workers): add dev worker and scout worker`
+## 8. Encoding End Goal 2 (Multi-Platform, Salesforce First)
+
+[Platform abstraction, Salesforce integration details, and path to multiple platforms]
+
+## 9. Git & Commit Discipline
+
+[Atomic aligned commits, commit message patterns, and doc/code coupling]
+
+## 10. Historical Context & Appendices (Optional)
+
+[Space to park legacy plans, v2 operator scripts, and historical notes migrated from docs/source-of-truth.md]
+````
+
+In the sections above, you must ensure:
+
+* **End Goals** have **explicit Definition-of-Done checklists** with boxes.
+* **Milestones** have **granular, extremely detailed check-off steps**, suitable for both humans and agents.
+* **Current Stage & Next Steps** is **short but precise**, always reflecting real work in progress.
+
+The rest of this contract describes the **content** that must live under these headings.
 
 ---
 
-## 7. Render blueprint (web + worker + KV + Postgres)
+## 3. End Goals (Deepened for Clarity)
 
-7.1 **Create folder `infra`** if it doesn’t exist.
+### 3.1 End Goal 1 – Self-Iterating DevinSwarm with HITL
 
-7.2 **Create root `render.yaml`** with:
+* DevinSwarm is a multi-agent AI swarm orchestrator (LangGraph JS, Node 20+, Redis + Postgres).
+* It can:
 
-```yaml
-services:
-  - type: web
-    name: devinswarm-service
-    runtime: node
-    plan: starter
-    buildCommand: "npm ci && npm run db:generate && npm run db:push && npm run build"
-    startCommand: "npm run start:service"
-    envVars:
-      - key: NODE_VERSION
-        value: "20.19.0"
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: devinswarm-kv
-          property: connectionString
-      - key: DATABASE_URL
-        fromDatabase:
-          name: devinswarm-postgres
-          property: connectionString
-      - key: GITHUB_APP_ID
-        sync: false
-      - key: GITHUB_INSTALLATION_ID
-        sync: false
-      - key: GITHUB_PRIVATE_KEY
-        sync: false
-      - key: GITHUB_WEBHOOK_SECRET
-        sync: false
-      - key: DAILY_BUDGET_USD
-        value: "75"
-      - key: AUTO_MERGE_LOW_RISK
-        value: "true"
-      - key: ALLOWED_REPOS
-        value: "DevinBristol/DevinSwarm"
-      - key: UI_TOKEN
-        sync: false
-    healthCheckPath: "/health"
+    * Accept intake tasks (via HTTP/API/UI).
+    * Plan work, dispatch to dev/reviewer/ops/research agents.
+    * Iterate on solutions.
+    * Surface changes as Git branches/PRs.
+    * Involve **human-in-the-loop (HITL)** at key checkpoints (design approval, risky change, deployment).
 
-  - type: worker
-    name: devinswarm-worker
-    runtime: node
-    plan: starter
-    buildCommand: "npm ci && npm run db:generate && npm run db:push && npm run build"
-    startCommand: "npm run start:worker"
-    envVars:
-      - key: NODE_VERSION
-        value: "20.19.0"
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: devinswarm-kv
-          property: connectionString
-      - key: DATABASE_URL
-        fromDatabase:
-          name: devinswarm-postgres
-          property: connectionString
-      - key: GITHUB_APP_ID
-        sync: false
-      - key: GITHUB_INSTALLATION_ID
-        sync: false
-      - key: GITHUB_PRIVATE_KEY
-        sync: false
-      - key: DAILY_BUDGET_USD
-        value: "75"
-      - key: AUTO_MERGE_LOW_RISK
-        value: "true"
-      - key: ALLOWED_REPOS
-        value: "DevinBristol/DevinSwarm"
+**Definition of Done for End Goal 1** (must appear, with checkboxes, in the runbook):
 
-  - type: keyvalue
-    name: devinswarm-kv
-    plan: starter
-    ipAllowList: []
+* [ ] Orchestrator can run 24/7 (local & Render deployments) handling multiple queued tasks.
+* [ ] Agents have clearly defined prompts and responsibilities in `AGENTS.md` and prompts folder.
+* [ ] Standard run lifecycle: `intake → plan → dev → review → ops → report/escalate` is implemented and observable in UI/logs.
+* [ ] HITL gates are configurable and documented (where humans approve/reject, and how that affects the run).
+* [ ] There is a clear, documented **self-iteration policy** and at least one real run exercising it.
 
-databases:
-  - name: devinswarm-postgres
-    plan: starter
-```
+### 3.2 End Goal 2 – Multi-Language / Multi-Platform Solutions (Salesforce First)
 
-Commit:
+* DevinSwarm must be capable of:
 
-> `infra(render): add render blueprint for service, worker, KV, and Postgres`
+    * Understanding tasks that target different languages and platforms (e.g., Apex/Salesforce, Node/TS, Python, etc.).
+    * Selecting or composing the right agents/tools/build pipelines for that platform.
+    * Producing artifacts and tests suitable for that platform.
+* **Initial focus**: Salesforce (Apex + metadata), integrating with Salesforce DX workflows and the `workforce-temp` pattern.
+
+**Definition of Done for End Goal 2** (must appear in the runbook):
+
+* [ ] The runbook documents a clear abstraction for “platforms” and “language targets”.
+* [ ] At least one platform plugin/path is fully implemented and used in production runs: Salesforce DX (Apex/metadata).
+* [ ] DevinSwarm can take an intake describing a Salesforce change, generate a branch with Apex/metadata changes, and align with Salesforce CI/CD (validation sandbox + quick deploy).
+* [ ] At least one additional non-Salesforce language/platform path is partially implemented and documented.
 
 ---
 
-## 8. README update (optional but recommended)
+## 4. Roadmap & Milestones (M1–M5)
 
-Append to or create `README.md` in the repo root (merge with any existing content):
+You must ensure the runbook contains, at minimum, these milestones with **detailed checklists** (you are encouraged to further explode each item into extremely granular sub-steps as you learn more):
 
-```md
-## DevinSwarm Bootstrap
+1. **Milestone 1 – Core Orchestrator & Runtime Foundation**
+2. **Milestone 2 – Agent Roles & Graph Stabilized**
+3. **Milestone 3 – HITL & Self-Iteration Loop**
+4. **Milestone 4 – Salesforce Platform Path (End Goal 2 – Phase 1)**
+5. **Milestone 5 – Multi-Platform Growth (Additional Languages/Targets)**
 
-This repo contains a multi-agent swarm with:
+Each item must be a checklist with boxes; as tasks complete, you **check them off** in the runbook.
 
-- Web service: `/health`, `/intake`, `/runs`, `/ui`
-- Worker: BullMQ (Redis) with concurrency 2
-- Durable state: Postgres (Prisma)
-- GitHub App: direct repo read/write (branches, commits, PRs)
-- Policy: daily budget, optional low-risk auto-merge
-- Escalation: blocked runs marked `awaiting_unblock` and surfaced via UI or GitHub Issue conventions.
-
-### Local development
-
-```bash
-cp .env.example .env
-docker compose -f infra/docker-compose.dev.yml up -d
-npm ci
-npm run db:generate
-npm run db:push
-npm run start:service  # http://localhost:3000/ui
-npm run start:worker
-```
-
-### Render deployment
-
-Use the root `render.yaml` as a Blueprint in Render. Set the following environment variables in the Render dashboard (do not commit secrets):
-
-- `OPENAI_API_KEY`
-- `GITHUB_APP_ID`
-- `GITHUB_INSTALLATION_ID`
-- `GITHUB_PRIVATE_KEY`
-- `GITHUB_WEBHOOK_SECRET`
-- `UI_TOKEN`
-```
-
-Commit:
-
-> `docs: document DevinSwarm bootstrap, local dev, and Render deploy`
+*(You may reuse or adapt the detailed checklists from your original script; they remain valid, but must live in `CODEx_RUNBOOK.md` under `## 2. Roadmap & Milestones`.)*
 
 ---
 
-## 9. Final checks
+## 5. Current Stage & Next Steps (Self-Updating)
 
-After all steps above are done:
+This section in the runbook is the **single source of truth** for “where we are” and “what’s next.”
 
-1. Ensure `npm ci` succeeds.
-2. Ensure `npm run db:generate` and `npm run db:push` succeed.
-3. Ensure `npm run start:service` and `npm run start:worker` both start without crashing.
-4. From a terminal, test:
+You must:
 
-```bash
-curl -s http://localhost:3000/health
-curl -s -X POST http://localhost:3000/intake   -H "Content-Type: application/json"   -d '{"repo":"DevinBristol/DevinSwarm","description":"Test run from Codex"}'
-```
+* Keep `CURRENT_MILESTONE`, `STATUS_SUMMARY`, `BLOCKERS`, and **3–7 Active Work Items** up to date.
+* Whenever you start a new significant task:
 
-5. Confirm `/ui` renders a table of runs in a browser.
+    * Ensure there is a corresponding Active Work Item.
+    * Update or add it in the runbook first.
+* When a work item is finished:
 
-When all of this works locally, the repo is ready for Render Blueprint deployment using the root `render.yaml`.
+    * Check it off in the runbook.
+    * If it completes a milestone sub-item, check that off too.
+
+This section is how you **bring yourself up to speed automatically** at startup.
+
+---
+
+## 6. Repo Map & Documentation Layout
+
+You must keep a **short but complete repo map** in the runbook, including:
+
+* Key directories and their purpose.
+* Key docs and how they relate to the runbook.
+* Pointers to any focused docs (Salesforce, CI/CD, etc.).
+
+Re-use the repo map structure from your original script and update as the project evolves.
+
+---
+
+## 7. Codex Startup Routine (No Human Calls Needed)
+
+Whenever you are loaded in this repo, you must run this sequence:
+
+1. **Identify yourself and context**
+
+    * Recognize that you are Codex, working in `DevinBristol/DevinSwarm`.
+    * Confirm the repo layout roughly matches what’s documented in the runbook.
+
+2. **Load the runbook**
+
+    * Open `CODEx_RUNBOOK.md`.
+    * Extract:
+
+        * End Goal 1 and End Goal 2.
+        * Current milestone & status.
+        * Current Active Work Items.
+
+3. **Align the current request with the runbook**
+
+    * Map the current prompt/issue/ticket to:
+
+        * A milestone.
+        * One or more Active Work Items (or create a new one if justified).
+    * If the request conflicts with the runbook:
+
+        * Propose the minimal change to the runbook that resolves the conflict.
+        * Apply it and proceed.
+
+4. **Gather local context**
+
+    * Open files relevant to the current milestone and work items:
+
+        * Orchestration: `orchestrator/*`, `runtime/*`, `prompts/*`, `AGENTS.md`.
+        * Infra/deployment: `infra/*`, `DEVINSWARM_RENDER_NEXT_STEPS.md`, `render.yaml`.
+        * Platform work (Salesforce etc.): platform modules + linked docs.
+
+5. **Plan first, then execute**
+
+    * Draft a short plan (few bullets) either:
+
+        * Embedded into the relevant Active Work Item, or
+        * In a small temporary `Plan` subsection under `## 3. Current Stage & Next Steps`.
+    * Then implement the plan in code/docs.
+
+6. **After implementation**
+
+    * Run relevant checks (tests, type-check, lint, smoke).
+    * Update:
+
+        * Milestone checklists in the runbook.
+        * `SWARM_PING.md` status snapshot.
+        * Any relevant view-docs (`AGENTS.md`, `DEVINSWARM_RENDER_NEXT_STEPS.md`, `docs/*`).
+    * Stage and commit **both docs and code together**.
+
+---
+
+## 8. Documentation Update Rules
+
+To keep docs organized and drift-free:
+
+1. **Runbook first**
+
+    * For any **new capability**, add or update the relevant milestone items and/or End Goals in `CODEx_RUNBOOK.md` first.
+
+2. **View-docs sync**
+
+    * Whenever you:
+
+        * Add or remove agents → update `AGENTS.md`.
+        * Change Render deployment steps or health checks → update `DEVINSWARM_RENDER_NEXT_STEPS.md`.
+        * Change overall status or readiness → update `SWARM_PING.md`.
+    * Ensure they all declare:
+
+      > Source of truth is `CODEx_RUNBOOK.md` – this file is a focused view. Do not diverge from the runbook.
+
+3. **Linking and discoverability**
+
+    * From `README.md`, link:
+
+        * `CODEx_RUNBOOK.md` as “Project Runbook (Source of Truth)”.
+        * `AGENTS.md` as “Agent Roles & Prompts”.
+        * `DEVINSWARM_RENDER_NEXT_STEPS.md` as “Render Deployment & Smoke Tests”.
+    * From `CODEx_RUNBOOK.md`, link out to:
+
+        * Important docs in `docs/`.
+        * External repos (e.g., Salesforce DX template projects).
+
+4. **Minimal duplication**
+
+    * Do not duplicate full milestone checklists in multiple files.
+    * If a subset checklist is needed elsewhere, reference the runbook and only restate what’s necessary.
+
+---
+
+## 9. Encoding End Goal 1 (Self-Iterating Swarm with HITL)
+
+As you evolve the repo, ensure that **each code change** moves DevinSwarm closer to End Goal 1:
+
+1. **Orchestrator & agents**
+
+    * Keep the LangGraph flow and agent responsibilities aligned with the End Goal 1 description in the runbook.
+    * Make sure the runbook’s description of the flow matches actual code paths.
+
+2. **HITL integration**
+
+    * Document and implement:
+
+        * Where humans approve or reject.
+        * How to pause runs awaiting human input.
+        * How to resume or escalate.
+
+3. **Self-iteration**
+
+    * Introduce and document:
+
+        * When the swarm should automatically re-plan or re-implement.
+        * Safeguards to avoid infinite loops (max iterations, confidence thresholds, explicit escalation paths).
+
+4. **Observability**
+
+    * Ensure:
+
+        * The UI and/or logs clearly expose run stages and HITL states.
+        * `SWARM_PING.md` summarizes whether the self-iteration loop is operational, partial, or experimental.
+
+---
+
+## 10. Encoding End Goal 2 (Multi-Platform, Salesforce First)
+
+To move toward End Goal 2, you must:
+
+1. **Document the concept of “platforms”**
+
+    * In the runbook, define a **Platform** as:
+
+        * A set of languages, tools, build/test/deploy pipelines, and constraints.
+    * Describe how a platform-aware run is chosen:
+
+        * From intake text.
+        * From explicit metadata.
+        * From repository context.
+
+2. **Salesforce as the first platform**
+
+    * Add a subsection for the **Salesforce platform**, referencing any Salesforce DX starter repos and describing how DevinSwarm interacts with them.
+    * Ensure:
+
+        * Dev agents know how to use Salesforce DX commands.
+        * Reviewer/ops agents handle Salesforce-specific concerns (validation sandbox, quick deploy, rollback, coverage requirements).
+
+3. **Code hooks for platforms**
+
+    * Create or refine modules so that:
+
+        * The orchestrator can dispatch tasks to platform-specific routines.
+        * Agents have prompts recognizing platform context.
+    * Document these modules in the repo map and relevant docs.
+
+4. **Future platforms**
+
+    * Document the process to add a new platform:
+
+        * Where to define it in code.
+        * How to add prompts and tests.
+        * How to integrate into CI/CD.
+
+---
+
+## 11. Git & Commit Discipline
+
+To ensure continuous, automatic handling and traceability:
+
+1. **Atomic, aligned commits**
+
+    * For each logical change, include:
+
+        * Code changes.
+        * Runbook updates (`CODEx_RUNBOOK.md`).
+        * Any necessary view-doc updates.
+    * Avoid commits that change code but leave docs inaccurate.
+
+2. **Commit messages**
+
+    * Include references to milestones and/or work items, e.g.:
+
+        * `M2: refine dev/reviewer agent prompts for swarm planning`
+        * `M4: wire initial Salesforce platform selection and runbook updates`
+
+3. **No direct commits to `main` without docs**
+
+    * If a change cannot be reflected in the runbook, do not merge it until the plan is clarified.
+
+---
+
+## 12. How Humans Should Use This Contract
+
+When a human developer opens this repo with Codex:
+
+1. They should ensure this file (`devinswarm_codex_bootstrap.md`) and `CODEx_RUNBOOK.md` are visible to you.
+2. They can issue prompts like:
+
+    * “Read `devinswarm_codex_bootstrap.md`, `CODEx_RUNBOOK.md`, and `docs/source-of-truth.md`, merge them into a single canonical runbook layout, then update milestones and next steps to reflect the current code.”
+3. You then follow:
+
+    * The **source-of-truth merge** instructions (Section 0).
+    * The **canonical runbook layout** (Section 2).
+    * The **invariants**, **startup routine**, and **update rules**.
+
+Over time, as DevinSwarm’s own workers take over development, this contract should be **mirrored and adapted** into the swarm’s internal prompts, but until End Goal 1 is reached, **you** (Codex) are responsible for maintaining it.

@@ -1,4 +1,9 @@
-# DevinSwarm Render v2 — Next Steps Cheat Sheet
+﻿> **Source of truth is `CODEx_RUNBOOK.md` - this file is a focused view. Do not diverge from the runbook.**
+>
+> Deployment cheat sheet for the current M1 (Orchestrator & State Model) stack. Roadmap/status lives in `CODEx_RUNBOOK.md` sections 2-4.
+
+
+# DevinSwarm Render v2 - Next Steps Cheat Sheet
 
 This file captures how to run DevinSwarm locally and on Render now that the service, worker, and GitHub App path are all working (runs reach `done` and open PRs).
 
@@ -33,7 +38,7 @@ This file captures how to run DevinSwarm locally and on Render now that the serv
 
 If this file exists, the repo is already migrated to the new stack; use it as the quick start for both local dev and Render.
 
-## Local Dev — How to Re-Run
+## Local Dev - How to Re-Run
 
 From `C:\Users\Devin\IdeaProjects\Swarm`:
 
@@ -66,7 +71,7 @@ Invoke-RestMethod http://localhost:3000/intake `
 Then open `http://localhost:3000/ui` in a browser.
 - `/ui` shows recent runs with state, phase, review/ops status, branch, and PR; it includes an intake form to enqueue new runs inline.
 
-## Render — Stack and Config (already applied)
+## Render - Stack and Config (already applied)
 
 Render is already configured via the root `render.yaml` as a Blueprint:
 
@@ -162,3 +167,7 @@ To test human-in-the-loop behavior on Render:
   - `ALLOWED_REPOS` contains `DevinBristol/DevinSwarm`.
 
 Use this file as the quick checklist to resume work if the dev environment crashes or you pick this up later, whether you are on your work PC or home PC.
+
+
+
+

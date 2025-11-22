@@ -1,6 +1,5 @@
-# Archived: Self-Iteration Deployment Plan
+> **Source of truth is `CODEx_RUNBOOK.md` - this file is a focused view. Do not diverge from the runbook.**
 
-This document has been archived to avoid multiple sources of truth. The current, living plan is in `docs/source-of-truth.md` on `main`.
+# Archived - see CODEx_RUNBOOK.md
 
-- Historical copy: `docs/archive/self-iteration-plan.md`
-- Active plan/status: `docs/source-of-truth.md`
+This document has been superseded by `CODEx_RUNBOOK.md` and is kept only for historical reference.
