@@ -82,9 +82,9 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 - **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Tests: `npm run test:orchestrator` (resume + event persistence/HITL checks via `scripts/run-ts-node.js`) and `npm run test:orchestrator-transitions` (node order, retry caps for plan/dev/review/ops, blocked history) are green. Latest local smoke log: `docs/logs/local-smoke-2025-11-22.md`. Render smokes succeeded after reviewer/ops low-heap tuning: `1eaab2fd-5760-4e2d-a798-74e1727c17e3` (PR #19) and `f36544e0-f8cb-4487-8c8a-9e8e3d532bfc` completed review/ops. Older OOM run `64addeb2-46ae-4092-ba6d-d9ed15248568` archived/closed.
 - **Blockers:** GitHub App secrets are present locally/Render. Redis/Postgres must be running. Windows `tsx`/esbuild EPERM avoided by removing `tsx` dependency and using `scripts/run-ts-node.js` (ts-node transpile-only) for TS entrypoints; npm emits a harmless `npm-prefix` warning after scripts. `msgpackr` `prepare` script fails when lifecycle scripts run; use `npm run ci:install` (`npm ci --ignore-scripts --prefer-offline --no-audit --progress=false`) in Cloud/CI until upstream is patched/pinned.
 - **Active work items:**
-  - [ ] Define and encode self-iteration policy (when to replan vs HITL vs fail) in this runbook and in `prompts/manager.md` (plus any worker prompts that consume it).
-  - [ ] Instrument event stream/UI to emit iteration metadata and reasons and surface them in `/ui`.
-  - [ ] Harden manager/dev/reviewer prompts to respect iteration limits and self-iteration policy.
+  - [x] Define and encode self-iteration policy (when to replan vs HITL vs fail) in this runbook and in `prompts/manager.md` (plus worker prompts).
+  - [x] Instrument event stream/UI to emit iteration metadata and reasons and surface them in `/ui`.
+  - [x] Harden manager/dev/reviewer/ops prompts to respect iteration limits and self-iteration policy.
   - [ ] (Optional) Pin `msgpackr` once upstream publishes a fixed build; current workaround relies on `--ignore-scripts`.
 
 ### M1 state model & event schema (reference)
