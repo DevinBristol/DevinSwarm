@@ -79,7 +79,7 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 ## 3. Current Stage & Next Steps
 
 - **Current milestone:** M1 - Orchestrator & State Model (Phase 1).
-- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Basic resume test exists (`npm run test:orchestrator`); fuller transition tests still pending. Local smoke run completed (id `0f92821d-ad1c-4566-b31a-bf3f9a86b93d`). Render smoke enqueued (id `64addeb2-46ae-4092-ba6d-d9ed15248568`) hit reviewer OOM (`HITL: repeated-test-failures`); defaults now raise reviewer/ops heap (`node --max-old-space-size=2048 ...`)—re-run needed.
+- **Status summary:** Graph + Postgres + Redis + Fastify service + dev/review/ops workers are wired. HITL blocks on missing secrets/test failures; unblock now requeues the correct worker stage automatically. Basic resume test exists (`npm run test:orchestrator`); fuller transition tests still pending. Local smoke run completed (id `0f92821d-ad1c-4566-b31a-bf3f9a86b93d`). Render smoke runs: `64addeb2-46ae-4092-ba6d-d9ed15248568` and `f36544e0-f8cb-4487-8c8a-9e8e3d532bfc` both hit reviewer OOM (`npm run build`); manual unblock leaves them blocked. Reviewer/ops defaults now bump heap (`node --max-old-space-size=2048 node_modules/.bin/tsc --noEmit`), redeploy + rerun needed.
 - **Blockers:** GitHub App secrets are present locally/Render. Redis/Postgres must be running. Render smoke needs unblock/resolution for review test failures.
 - **Active work items:**
   - [ ] Add automated tests for `orchestrator/graph/manager.graph.ts` covering retry caps, status transitions, and event persistence.
@@ -89,7 +89,7 @@ DevinSwarm should understand platform targets, select the right tools/pipelines,
 
 Default actions to pick up next:
 - [ ] Expand orchestrator transition tests (retry caps, HITL paths) beyond the new `npm run test:orchestrator`.
-- [ ] Resolve the Render smoke block (run `64addeb2-46ae-4092-ba6d-d9ed15248568`, reviewer OOM; heap bump applied) and capture the outcome; local smoke recorded (run `0f92821d-ad1c-4566-b31a-bf3f9a86b93d`).
+- [ ] Redeploy with reviewer/ops heap bump and rerun Render smoke (blocked runs `64addeb2-46ae-4092-ba6d-d9ed15248568`, `f36544e0-f8cb-4487-8c8a-9e8e3d532bfc`); capture outcome. Local smoke recorded (`0f92821d-ad1c-4566-b31a-bf3f9a86b93d`).
 
 ## 4. Repo Map & Documentation Layout
 
