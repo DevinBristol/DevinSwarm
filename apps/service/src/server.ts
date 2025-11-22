@@ -121,10 +121,17 @@ app.get("/ui", async (req, rep) => {
 
   const runs = await prisma.run.findMany({
     where: {
-      ...(stateFilter ? { state: stateFilter } : {}),
+      ...(stateFilter ? { state: stateFilter as any } : {}),
       ...(phaseFilter ? { phase: phaseFilter } : {}),
-      ...(iterFilter ? { statusHistory: { path: ["iteration"], equals: iterFilter } as any } : {}),
-      ...(runIdFilter ? { id: { contains: runIdFilter } as any } : {}),
+      ...(iterFilter
+        ? {
+            statusHistory: {
+              path: ["iteration"],
+              equals: iterFilter,
+            } as any,
+          }
+        : {}),
+      ...(runIdFilter ? { id: { contains: runIdFilter } } : {}),
     },
     orderBy: { createdAt: "desc" },
     take: 50,
