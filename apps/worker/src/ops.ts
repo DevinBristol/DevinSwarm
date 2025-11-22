@@ -7,9 +7,10 @@ import { runTests } from "../../../tools/tests";
 
 const prisma = new PrismaClient();
 
-// Default to higher heap to avoid OOM on small instances (Render).
+// Default command tuned for 512MB instances (Render): smaller heap cap + skip lib checks.
 const opsCommand =
-  process.env.OPS_COMMAND ?? "node --max-old-space-size=2048 node_modules/.bin/tsc --noEmit";
+  process.env.OPS_COMMAND ??
+  "node --max-old-space-size=384 node_modules/.bin/tsc --noEmit --skipLibCheck --pretty false";
 const opsStatusContext = process.env.OPS_STATUS_CONTEXT ?? "swarm/ops";
 
 // Light env snapshot for debugging (no secrets).
